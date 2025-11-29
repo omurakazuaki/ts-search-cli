@@ -2,7 +2,11 @@
   "name": "code-semantic-search",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "code-nav": "./dist/cli.js"
+  },
   "scripts": {
+    "build": "tsc && chmod +x dist/cli.js",
     "start": "ts-node src/main.ts",
     "test": "jest",
     "lint": "eslint \"{src,.}/**/*.ts\" --fix",
