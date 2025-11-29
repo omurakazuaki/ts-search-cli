@@ -1,8 +1,8 @@
-# code-semantic-search
+# ts-search-cli
 
 **Agent-Oriented Code Navigation Tool**
 
-`code-semantic-search` is a CLI tool designed to act as a bridge between LLM Agents (like GitHub Copilot, ChatGPT, etc.) and the Language Server Protocol (LSP). It allows agents to explore a codebase semantically, finding definitions, references, and inspecting code with the precision of a full-fledged IDE.
+`ts-search-cli` is a CLI tool designed to act as a bridge between LLM Agents (like GitHub Copilot, ChatGPT, etc.) and the Language Server Protocol (LSP). It allows agents to explore a codebase semantically, finding definitions, references, and inspecting code with the precision of a full-fledged IDE.
 
 ## Features
 
