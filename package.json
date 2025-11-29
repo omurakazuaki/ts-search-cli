@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "ts-node poc.ts",
+    "start": "ts-node src/main.ts",
     "test": "jest",
     "lint": "eslint \"{src,.}/**/*.ts\" --fix",
     "format": "prettier --write \"{src,.}/**/*.ts\""
   },
   "dependencies": {
+    "fastify": "^5.6.2",
     "typescript": "^5.0.0",
     "typescript-language-server": "^4.0.0",
     "vscode-jsonrpc": "^8.2.0",
