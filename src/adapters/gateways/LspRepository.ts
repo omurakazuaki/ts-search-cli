@@ -22,6 +22,29 @@ export class LspRepository implements ILspRepository {
 
     this.connection.listen();
 
+    // Handle progress creation request
+    this.connection.onRequest('window/workDoneProgress/create', () => null);
+
+    // Track project loading progress
+    let loadingPromiseResolver: () => void;
+    const loadingPromise = new Promise<void>((resolve) => {
+      loadingPromiseResolver = resolve;
+    });
+
+    let initToken: string | number | null = null;
+    let hasStarted = false;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.connection.onNotification('$/progress', (params: any) => {
+      if (params.value.kind === 'begin' && params.value.title.includes('Initializing JS/TS')) {
+        initToken = params.token;
+        hasStarted = true;
+      }
+      if (params.value.kind === 'end' && params.token === initToken) {
+        loadingPromiseResolver();
+      }
+    });
+
     const rootPath = path.resolve(process.cwd());
     const initParams: lsp.InitializeParams = {
       processId: process.pid,
@@ -39,6 +62,9 @@ export class LspRepository implements ILspRepository {
         workspace: {
           symbol: { dynamicRegistration: false },
         },
+        window: {
+          workDoneProgress: true,
+        },
       },
       workspaceFolders: [
         {
@@ -55,6 +81,29 @@ export class LspRepository implements ILspRepository {
     const tsFile = await this.findTsFile(rootPath);
     if (tsFile) {
       await this.openDocument(tsFile);
+
+      // Warm-up: Request document symbols
+      const absPath = path.resolve(tsFile);
+      const uri = `file://${absPath}`;
+      try {
+        await this.connection.sendRequest('textDocument/documentSymbol', {
+          textDocument: { uri },
+        });
+      } catch {
+        // Ignore warm-up errors
+      }
+
+      // Wait for loading to complete if it started
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      if (hasStarted) {
+        console.log('Waiting for project indexing to complete...');
+        const timeout = new Promise((resolve) => setTimeout(resolve, 30000));
+        await Promise.race([loadingPromise, timeout]);
+        console.log('Project indexing completed or timed out.');
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
   }
 

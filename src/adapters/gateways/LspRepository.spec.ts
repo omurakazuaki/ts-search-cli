@@ -29,6 +29,8 @@ describe('LspRepository', () => {
       sendRequest: jest.fn(),
       sendNotification: jest.fn(),
       dispose: jest.fn(),
+      onRequest: jest.fn(),
+      onNotification: jest.fn(),
     } as unknown as jest.Mocked<rpc.MessageConnection>;
 
     (rpc.createMessageConnection as jest.Mock).mockReturnValue(mockConnection);
@@ -41,15 +43,32 @@ describe('LspRepository', () => {
   });
 
   describe('initialize', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('should start process and initialize connection', async () => {
       (fs.readdir as jest.Mock).mockResolvedValue(['test.ts']);
       (fs.readFile as jest.Mock).mockResolvedValue('content');
 
-      await repository.initialize();
+      const initPromise = repository.initialize();
+
+      // Fast-forward through the initial waits
+      await jest.runAllTimersAsync();
+
+      await initPromise;
 
       expect(mockProcessManager.start).toHaveBeenCalled();
       expect(rpc.createMessageConnection).toHaveBeenCalled();
       expect(mockConnection.listen).toHaveBeenCalled();
+      expect(mockConnection.onRequest).toHaveBeenCalledWith(
+        'window/workDoneProgress/create',
+        expect.any(Function),
+      );
       expect(mockConnection.sendRequest).toHaveBeenCalledWith('initialize', expect.any(Object));
       expect(mockConnection.sendNotification).toHaveBeenCalledWith('initialized', {});
       expect(mockConnection.sendNotification).toHaveBeenCalledWith(
@@ -58,15 +77,70 @@ describe('LspRepository', () => {
       );
     });
 
+    it('should wait for indexing to complete if progress notification is received', async () => {
+      (fs.readdir as jest.Mock).mockResolvedValue(['test.ts']);
+      (fs.readFile as jest.Mock).mockResolvedValue('content');
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let progressCallback: ((params: any) => void) | undefined;
+      (mockConnection.onNotification as jest.Mock).mockImplementation((method, handler) => {
+        if (method === '$/progress') {
+          progressCallback = handler;
+        }
+      });
+
+      const initPromise = repository.initialize();
+
+      // Allow async operations to proceed until the first timer
+      // We need enough ticks to reach the 500ms wait inside initialize
+      for (let i = 0; i < 50; i++) {
+        await Promise.resolve();
+      }
+
+      // Trigger 'begin' notification
+      if (progressCallback) {
+        progressCallback({
+          token: '123',
+          value: { kind: 'begin', title: 'Initializing JS/TS language features' },
+        });
+      }
+
+      // Advance time to finish the 500ms wait
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Now it should be waiting for the 'end' notification or 30s timeout.
+      // Trigger 'end' notification
+      if (progressCallback) {
+        progressCallback({
+          token: '123',
+          value: { kind: 'end' },
+        });
+      }
+
+      // It should resolve now
+      await initPromise;
+
+      expect(mockConnection.onNotification).toHaveBeenCalledWith(
+        '$/progress',
+        expect.any(Function),
+      );
+    });
+
     it('should handle errors during file opening', async () => {
       (fs.readdir as jest.Mock).mockRejectedValue(new Error('Error'));
-      await repository.initialize();
+      const initPromise = repository.initialize();
+      await jest.runAllTimersAsync();
+      await initPromise;
       // Should not throw
     });
 
     it('should not open document if no ts file found', async () => {
       (fs.readdir as jest.Mock).mockResolvedValue(['readme.md']);
-      await repository.initialize();
+      const initPromise = repository.initialize();
+      await jest.runAllTimersAsync();
+      await initPromise;
       expect(mockConnection.sendNotification).not.toHaveBeenCalledWith(
         'textDocument/didOpen',
         expect.any(Object),
