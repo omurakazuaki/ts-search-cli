@@ -6,14 +6,15 @@ import * as fs from 'fs/promises';
 import * as net from 'net';
 import * as path from 'path';
 import { CliPresenter } from './adapters/presenters/CliPresenter';
+import { getDaemonFilePath } from './utils/daemon';
 
 const cli = cac('ts-search');
-const DAEMON_FILE = '.ts-search-daemon.json';
 const presenter = new CliPresenter();
 
 async function getDaemonInfo(): Promise<{ port: number; pid: number } | null> {
   try {
-    const content = await fs.readFile(path.resolve(process.cwd(), DAEMON_FILE), 'utf-8');
+    const daemonFilePath = getDaemonFilePath(process.cwd());
+    const content = await fs.readFile(daemonFilePath, 'utf-8');
     return JSON.parse(content);
   } catch {
     return null;
@@ -63,7 +64,8 @@ async function ensureServerRunning(): Promise<number> {
     }
     // Stale file, remove it
     try {
-      await fs.unlink(path.resolve(process.cwd(), DAEMON_FILE));
+      const daemonFilePath = getDaemonFilePath(process.cwd());
+      await fs.unlink(daemonFilePath);
     } catch {
       // Ignore
     }

@@ -1,5 +1,4 @@
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import * as portfinder from 'portfinder';
 import { NavigationController } from './adapters/controllers/NavigationController';
 import { FsRepository } from './adapters/gateways/FsRepository';
@@ -10,8 +9,7 @@ import { FindSymbolUseCase } from './usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from './usecases/InspectCodeUseCase';
 import { MapFileUseCase } from './usecases/MapFileUseCase';
 import { SearchSymbolUseCase } from './usecases/SearchSymbolUseCase';
-
-const DAEMON_FILE = '.ts-search-daemon.json';
+import { getDaemonFilePath } from './utils/daemon';
 
 async function bootstrap() {
   try {
@@ -52,13 +50,14 @@ async function bootstrap() {
 
     // Write daemon info
     const daemonInfo = { port, pid: process.pid };
-    await fs.writeFile(path.resolve(process.cwd(), DAEMON_FILE), JSON.stringify(daemonInfo));
+    const daemonFilePath = getDaemonFilePath(process.cwd());
+    await fs.writeFile(daemonFilePath, JSON.stringify(daemonInfo));
 
     // Graceful shutdown
     const shutdown = async () => {
       console.log('Shutting down...');
       try {
-        await fs.unlink(path.resolve(process.cwd(), DAEMON_FILE));
+        await fs.unlink(daemonFilePath);
       } catch {
         // Ignore if file already gone
       }
