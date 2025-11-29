@@ -210,7 +210,8 @@ export class LspRepository implements ILspRepository {
       (key) => (lsp.SymbolKind as any)[key] === symbol.kind,
     );
     // Create ID based on selectionRange (the identifier)
-    const id = `${filePath}::${symbol.selectionRange.start.line + 1}::${symbol.selectionRange.start.character + 1}`;
+    const relativePath = path.relative(process.cwd(), filePath);
+    const id = `${relativePath}::${symbol.selectionRange.start.line + 1}::${symbol.selectionRange.start.character + 1}`;
 
     return {
       id,
@@ -269,9 +270,10 @@ export class LspRepository implements ILspRepository {
 
   private createId(location: lsp.Location): string {
     const filePath = this.uriToPath(location.uri);
+    const relativePath = path.relative(process.cwd(), filePath);
     const line = location.range.start.line + 1;
     const character = location.range.start.character + 1;
-    return `${filePath}::${line}::${character}`;
+    return `${relativePath}::${line}::${character}`;
   }
 
   private uriToPath(uri: string): string {

@@ -1,7 +1,12 @@
+import * as path from 'path';
 import Table from 'cli-table3';
 import { CodeContext, LocationRef, SymbolInfo } from '../../domain/entities';
 
 export class CliPresenter {
+  private toRelativePath(filePath: string): string {
+    return path.relative(process.cwd(), filePath);
+  }
+
   public present(data: unknown, options: { table?: boolean }): void {
     if (!options.table) {
       console.log(JSON.stringify(data, null, 2));
@@ -87,7 +92,7 @@ export class CliPresenter {
 
     locations.forEach((loc) => {
       table.push([
-        loc.filePath,
+        this.toRelativePath(loc.filePath),
         loc.line,
         loc.kind,
         loc.preview?.trim().substring(0, 50) || '',
@@ -106,7 +111,7 @@ export class CliPresenter {
     });
     const def = result.definition;
     defTable.push([
-      def.filePath,
+      this.toRelativePath(def.filePath),
       def.line,
       def.kind,
       def.preview?.trim().substring(0, 50) || '',
@@ -129,7 +134,7 @@ export class CliPresenter {
       style: { head: ['cyan'] },
     });
     table.push([
-      result.filePath,
+      this.toRelativePath(result.filePath),
       `${result.range.startLine}-${result.range.endLine}`,
       result.relatedSymbols?.length || 0,
     ]);
