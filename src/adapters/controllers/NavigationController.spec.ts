@@ -3,6 +3,7 @@ import { SymbolNotFoundError } from '../../domain/errors';
 import { FindSymbolUseCase } from '../../usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from '../../usecases/InspectCodeUseCase';
 import { MapFileUseCase } from '../../usecases/MapFileUseCase';
+import { SearchSymbolUseCase } from '../../usecases/SearchSymbolUseCase';
 import { NavigationController } from './NavigationController';
 
 describe('NavigationController', () => {
@@ -10,14 +11,21 @@ describe('NavigationController', () => {
   let mockMapFileUC: jest.Mocked<MapFileUseCase>;
   let mockFindSymbolUC: jest.Mocked<FindSymbolUseCase>;
   let mockInspectCodeUC: jest.Mocked<InspectCodeUseCase>;
+  let mockSearchSymbolUC: jest.Mocked<SearchSymbolUseCase>;
   let mockReply: jest.Mocked<FastifyReply>;
 
   beforeEach(() => {
     mockMapFileUC = { execute: jest.fn() } as unknown as jest.Mocked<MapFileUseCase>;
     mockFindSymbolUC = { execute: jest.fn() } as unknown as jest.Mocked<FindSymbolUseCase>;
     mockInspectCodeUC = { execute: jest.fn() } as unknown as jest.Mocked<InspectCodeUseCase>;
+    mockSearchSymbolUC = { execute: jest.fn() } as unknown as jest.Mocked<SearchSymbolUseCase>;
 
-    controller = new NavigationController(mockMapFileUC, mockFindSymbolUC, mockInspectCodeUC);
+    controller = new NavigationController(
+      mockMapFileUC,
+      mockFindSymbolUC,
+      mockInspectCodeUC,
+      mockSearchSymbolUC,
+    );
 
     mockReply = {
       status: jest.fn().mockReturnThis(),
@@ -30,7 +38,7 @@ describe('NavigationController', () => {
       const req = { query: { path: 'src/test.ts' } } as FastifyRequest<{
         Querystring: { path: string };
       }>;
-      const symbols = [{ name: 'Test', kind: 'Class', line: 1 }];
+      const symbols = [{ id: 'id1', name: 'Test', kind: 'Class', line: 1 }];
       mockMapFileUC.execute.mockResolvedValue(symbols);
 
       await controller.mapFile(req, mockReply);
@@ -47,8 +55,8 @@ describe('NavigationController', () => {
 
   describe('find', () => {
     it('should return 404 if symbol not found', async () => {
-      const req = { query: { query: 'Unknown' } } as FastifyRequest<{
-        Querystring: { query: string };
+      const req = { query: { id: 'Unknown' } } as FastifyRequest<{
+        Querystring: { id: string };
       }>;
       mockFindSymbolUC.execute.mockRejectedValue(new SymbolNotFoundError('Unknown'));
 

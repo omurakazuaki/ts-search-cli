@@ -1,5 +1,4 @@
 import { LocationRef } from '../domain/entities';
-import { SymbolNotFoundError } from '../domain/errors';
 import { FindSymbolUseCase } from './FindSymbolUseCase';
 import { ILspRepository } from './ports/ILspRepository';
 
@@ -22,7 +21,7 @@ describe('FindSymbolUseCase', () => {
 
   it('should return definition and references when symbol is found', async () => {
     const definition: LocationRef = {
-      id: 'def-id',
+      id: 'src/test.ts::10::5',
       filePath: 'src/test.ts',
       line: 10,
       character: 5,
@@ -41,20 +40,34 @@ describe('FindSymbolUseCase', () => {
       },
     ];
 
-    mockRepo.getWorkspaceSymbols.mockResolvedValue([definition]);
+    // Mock getDocumentSymbols to return a symbol that matches the ID
+    mockRepo.getDocumentSymbols.mockResolvedValue([
+      {
+        id: 'src/test.ts::10::5',
+        name: 'Test',
+        kind: 'Class',
+        line: 10,
+        range: {
+          start: { line: 10, character: 1 },
+          end: { line: 10, character: 20 },
+        },
+        selectionRange: {
+          start: { line: 10, character: 5 },
+          end: { line: 10, character: 9 },
+        },
+      },
+    ]);
     mockRepo.getReferences.mockResolvedValue(references);
 
-    const result = await useCase.execute('Test');
+    const result = await useCase.execute('src/test.ts::10::5');
 
-    expect(result.definition).toBe(definition);
+    expect(result.definition.id).toBe('src/test.ts::10::5');
     expect(result.references).toBe(references);
-    expect(mockRepo.getWorkspaceSymbols).toHaveBeenCalledWith('Test');
+    expect(mockRepo.getDocumentSymbols).toHaveBeenCalledWith('src/test.ts');
     expect(mockRepo.getReferences).toHaveBeenCalledWith('src/test.ts', 10, 5);
   });
 
-  it('should throw SymbolNotFoundError when no symbol is found', async () => {
-    mockRepo.getWorkspaceSymbols.mockResolvedValue([]);
-
-    await expect(useCase.execute('Unknown')).rejects.toThrow(SymbolNotFoundError);
+  it('should throw Error when ID format is invalid', async () => {
+    await expect(useCase.execute('InvalidID')).rejects.toThrow('Invalid ID format');
   });
 });

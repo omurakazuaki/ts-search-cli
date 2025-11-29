@@ -22,11 +22,13 @@ describe('MapFileUseCase', () => {
   it('should flatten symbol tree', async () => {
     const tree: SymbolInfo[] = [
       {
+        id: 'id1',
         name: 'ClassA',
         kind: 'Class',
         line: 1,
         children: [
           {
+            id: 'id2',
             name: 'method1',
             kind: 'Method',
             line: 2,
@@ -35,6 +37,7 @@ describe('MapFileUseCase', () => {
         ],
       },
       {
+        id: 'id3',
         name: 'FunctionB',
         kind: 'Function',
         line: 10,

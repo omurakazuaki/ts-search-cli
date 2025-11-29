@@ -9,6 +9,7 @@
     "build": "tsc && chmod +x dist/cli.js",
     "start": "ts-node src/main.ts",
     "test": "jest",
+    "coverage": "jest --coverage",
     "lint": "eslint \"{src,.}/**/*.ts\" --fix",
     "format": "prettier --write \"{src,.}/**/*.ts\""
   },
