@@ -193,6 +193,5 @@ Daemon に HTTP リクエストを投げる CLI を実装する。
 ### Phase 5: Lazy Start & Dynamic Port [完了]
 
 - **Lazy Start**: CLI 実行時にサーバーが起動していなければ自動的に起動する。
-- **Dynamic Port**: `portfinder` を用いて空きポートを動的に割り当て、`.code-nav-daemon.json` でポート番号を共有する。
+- **Dynamic Port**: `portfinder` を用いて空きポートを動的に割り当て、`.ts-search-daemon.json` でポート番号を共有する。
 - **Lifecycle**: `stop` コマンドおよび `/shutdown` エンドポイントによるグレースフルシャットダウン。
-

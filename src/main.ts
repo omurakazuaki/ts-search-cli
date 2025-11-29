@@ -10,7 +10,7 @@ import { FindSymbolUseCase } from './usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from './usecases/InspectCodeUseCase';
 import { MapFileUseCase } from './usecases/MapFileUseCase';
 
-const DAEMON_FILE = '.code-nav-daemon.json';
+const DAEMON_FILE = '.ts-search-daemon.json';
 
 async function bootstrap() {
   try {
@@ -38,7 +38,7 @@ async function bootstrap() {
     const server = createServer(controller);
 
     // Find a free port
-    const port = await portfinder.getPortPromise({ port: 3000 });
+    const port = await portfinder.getPortPromise({ port: 30000 });
 
     await server.listen({ port, host: '127.0.0.1' });
     console.log(`Server listening on http://localhost:${port}`);

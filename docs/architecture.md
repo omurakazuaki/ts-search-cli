@@ -199,7 +199,7 @@ await lspProcess.start(); // サーバー起動待機
 
     // 5. Server
     const server = createServer(controller);
-    await server.listen(3000);
+    await server.listen(30000);
 
 }
 

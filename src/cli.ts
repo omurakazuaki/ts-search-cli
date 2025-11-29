@@ -6,8 +6,8 @@ import * as fs from 'fs/promises';
 import * as net from 'net';
 import * as path from 'path';
 
-const cli = cac('code-nav');
-const DAEMON_FILE = '.code-nav-daemon.json';
+const cli = cac('ts-search');
+const DAEMON_FILE = '.ts-search-daemon.json';
 
 async function getDaemonInfo(): Promise<{ port: number; pid: number } | null> {
   try {

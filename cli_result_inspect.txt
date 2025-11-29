@@ -1,8 +1,0 @@
-Error: Command failed: npx ts-node src/cli.ts inspect "/home/omura/work/2025/11/29/code-semantic-search/src/adapters/gateways/LspRepository.integration.spec.ts::32::11"
-npm warn cli npm v11.6.4 does not support Node.js v20.15.0. This version of npm supports the following node versions: `^20.17.0 || >=22.9.0`. You can find the latest version at https://nodejs.org/.
-Error: 500 - {"error":"Internal Server Error"}
-
-Stdout: Starting CLI...
-
-Stderr: npm warn cli npm v11.6.4 does not support Node.js v20.15.0. This version of npm supports the following node versions: `^20.17.0 || >=22.9.0`. You can find the latest version at https://nodejs.org/.
-Error: 500 - {"error":"Internal Server Error"}

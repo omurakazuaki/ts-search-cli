@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "bin": {
-    "code-nav": "./dist/cli.js"
+    "ts-search": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",
