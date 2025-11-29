@@ -15,6 +15,7 @@ export interface CodeContext {
 }
 
 export interface SymbolInfo {
+  id: string;
   name: string;
   kind: string;
   line: number;

@@ -3,12 +3,14 @@ import { AmbiguousSymbolError, SymbolNotFoundError } from '../../domain/errors';
 import { FindSymbolUseCase } from '../../usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from '../../usecases/InspectCodeUseCase';
 import { MapFileUseCase } from '../../usecases/MapFileUseCase';
+import { SearchSymbolUseCase } from '../../usecases/SearchSymbolUseCase';
 
 export class NavigationController {
   constructor(
     private readonly mapFileUC: MapFileUseCase,
     private readonly findSymbolUC: FindSymbolUseCase,
     private readonly inspectCodeUC: InspectCodeUseCase,
+    private readonly searchSymbolUC: SearchSymbolUseCase,
   ) {}
 
   async mapFile(req: FastifyRequest<{ Querystring: { path: string } }>, reply: FastifyReply) {
@@ -25,14 +27,28 @@ export class NavigationController {
     }
   }
 
-  async find(req: FastifyRequest<{ Querystring: { query: string } }>, reply: FastifyReply) {
+  async search(req: FastifyRequest<{ Querystring: { query: string } }>, reply: FastifyReply) {
     const { query } = req.query;
     if (!query) {
       return reply.status(400).send({ error: 'Missing query parameter' });
     }
 
     try {
-      const result = await this.findSymbolUC.execute(query);
+      const candidates = await this.searchSymbolUC.execute(query);
+      return reply.send({ candidates });
+    } catch (error) {
+      return this.handleError(error, reply);
+    }
+  }
+
+  async find(req: FastifyRequest<{ Querystring: { id: string } }>, reply: FastifyReply) {
+    const { id } = req.query;
+    if (!id) {
+      return reply.status(400).send({ error: 'Missing id parameter' });
+    }
+
+    try {
+      const result = await this.findSymbolUC.execute(id);
       return reply.send(result);
     } catch (error) {
       return this.handleError(error, reply);

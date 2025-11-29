@@ -31,21 +31,29 @@ Lists all symbols (classes, functions, variables) in a specific file.
 npx ts-search map src/domain/entities.ts
 ```
 
-### 2. Find Symbol Definition & References
+### 2. Search Symbols
 
-Finds where a symbol is defined and all places where it is referenced.
-Includes a "2-step lookup" mechanism to accurately locate exported symbols.
+Search for symbols by name across the entire project. Returns a list of candidates with their IDs.
 
 ```bash
-npx ts-search find LocationRef
+npx ts-search search LocationRef
 ```
 
-### 3. Inspect Code
+### 3. Find Symbol Definition & References
+
+Finds where a symbol is defined and all places where it is referenced using a specific ID.
+The ID is obtained from `map` or `search` commands.
+
+```bash
+npx ts-search find "src/domain/entities.ts::1::1"
+```
+
+### 4. Inspect Code
 
 Reads the code surrounding a specific symbol or location ID.
 
 ```bash
-# Inspect by ID (returned from map or find)
+# Inspect by ID (returned from map, search, or find)
 npx ts-search inspect "src/domain/entities.ts::10::1"
 
 # Options
@@ -53,7 +61,7 @@ npx ts-search inspect <id> --expand block    # (Default) Read the containing blo
 npx ts-search inspect <id> --expand surround # Read surrounding lines
 ```
 
-### 4. Stop Server
+### 5. Stop Server
 
 Stops the background daemon process.
 

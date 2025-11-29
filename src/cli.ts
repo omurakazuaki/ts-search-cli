@@ -123,10 +123,19 @@ cli.command('map <file>', 'Map symbols in a file').action(
   }),
 );
 
-cli.command('find <query>', 'Find a symbol by query').action(
+cli.command('search <query>', 'Search for symbols by name').action(
   withServer(async (baseUrl, query) => {
-    const response = await axios.get(`${baseUrl}/find`, {
+    const response = await axios.get(`${baseUrl}/search`, {
       params: { query },
+    });
+    console.log(JSON.stringify(response.data, null, 2));
+  }),
+);
+
+cli.command('find <id>', 'Find definition and references by ID').action(
+  withServer(async (baseUrl, id) => {
+    const response = await axios.get(`${baseUrl}/find`, {
+      params: { id },
     });
     console.log(JSON.stringify(response.data, null, 2));
   }),

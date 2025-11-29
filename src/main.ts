@@ -9,6 +9,7 @@ import { createServer } from './infrastructure/server/server';
 import { FindSymbolUseCase } from './usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from './usecases/InspectCodeUseCase';
 import { MapFileUseCase } from './usecases/MapFileUseCase';
+import { SearchSymbolUseCase } from './usecases/SearchSymbolUseCase';
 
 const DAEMON_FILE = '.ts-search-daemon.json';
 
@@ -30,9 +31,15 @@ async function bootstrap() {
     const mapFileUC = new MapFileUseCase(lspRepo);
     const findSymbolUC = new FindSymbolUseCase(lspRepo);
     const inspectCodeUC = new InspectCodeUseCase(lspRepo, fsRepo);
+    const searchSymbolUC = new SearchSymbolUseCase(lspRepo);
 
     // 4. Controllers
-    const controller = new NavigationController(mapFileUC, findSymbolUC, inspectCodeUC);
+    const controller = new NavigationController(
+      mapFileUC,
+      findSymbolUC,
+      inspectCodeUC,
+      searchSymbolUC,
+    );
 
     // 5. Server
     const server = createServer(controller);

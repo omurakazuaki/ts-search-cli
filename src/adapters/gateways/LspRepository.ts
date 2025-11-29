@@ -91,7 +91,7 @@ export class LspRepository implements ILspRepository {
 
     // Handle both DocumentSymbol[] and SymbolInformation[]
     if (result.length > 0 && 'range' in result[0] && 'selectionRange' in result[0]) {
-      return (result as lsp.DocumentSymbol[]).map((s) => this.mapDocumentSymbol(s));
+      return (result as lsp.DocumentSymbol[]).map((s) => this.mapDocumentSymbol(s, filePath));
     }
 
     return [];
@@ -196,11 +196,15 @@ export class LspRepository implements ILspRepository {
     }
   }
 
-  private mapDocumentSymbol(symbol: lsp.DocumentSymbol): SymbolInfo {
+  private mapDocumentSymbol(symbol: lsp.DocumentSymbol, filePath: string): SymbolInfo {
     const kindString = Object.keys(lsp.SymbolKind).find(
       (key) => (lsp.SymbolKind as any)[key] === symbol.kind,
     );
+    // Create ID based on selectionRange (the identifier)
+    const id = `${filePath}::${symbol.selectionRange.start.line + 1}::${symbol.selectionRange.start.character + 1}`;
+
     return {
+      id,
       name: symbol.name,
       kind: kindString || 'Unknown',
       line: symbol.range.start.line + 1,
@@ -224,7 +228,7 @@ export class LspRepository implements ILspRepository {
           character: symbol.selectionRange.end.character + 1,
         },
       },
-      children: symbol.children?.map((c) => this.mapDocumentSymbol(c)),
+      children: symbol.children?.map((c) => this.mapDocumentSymbol(c, filePath)),
     };
   }
 

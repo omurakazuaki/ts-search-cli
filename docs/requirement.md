@@ -74,15 +74,23 @@ interface CodeContext {
   - filePath: string (例: "src/user.ts")
 - Returns: { "symbols": [{ "name": "User", "kind": "Class", "line": 10 }, ...] }
 
-#### B. find (検索)
+#### B. search (検索)
 
-シンボル名から定義または参照を探す。
+プロジェクト全体からシンボル名を検索する。
 
 - Params:
   - query: string (検索したいシンボル名)
+- Returns: { "candidates": LocationRef[] }
+
+#### C. find (追跡)
+
+ID から定義または参照を探す。
+
+- Params:
+  - id: string (map や search で取得した ID)
 - Returns: { "definition": LocationRef, "references": LocationRef[] }
 
-#### C. inspect (詳細)
+#### D. inspect (詳細)
 
 ID を指定してコードを取得する。
 
@@ -91,7 +99,7 @@ ID を指定してコードを取得する。
   - expand: "block" (関数全体など) | "surround" (前後 5 行)
 - Returns: { "result": CodeContext }
 
-#### D. lifecycle (管理)
+#### E. lifecycle (管理)
 
 - start: デーモン起動・初期化。
 - stop: デーモン停止。
@@ -118,24 +126,33 @@ LSP Method: textDocument/documentSymbol
 1. textDocument/didOpen を送信（念のためファイルを最新状態として認識させる）。
 2. documentSymbol をリクエスト。
 3. 返ってきた階層構造（Tree）をフラットなリストに変換して返す。
+4. 各シンボルに ID (filePath::line::character) を付与する。
 
-### 4.3 find の処理 (最重要・高難易度)
+### 4.3 search の処理
 
-LSP の findReferences は「位置（行・列）」引数を要求しますが、ユーザー入力は「名前（文字列）」です。ここを埋めるロジックが必要です。
+LSP Method: workspace/symbol
 
-1. 名前解決
-   - LSP Method: workspace/symbol
-   - 入力された query 文字列でプロジェクト全体を検索し、候補となる Location を取得する。
-   - 候補が複数ある場合（同名のクラスと変数など）、一旦「候補リスト」を返すか、heuristic に一番近いものを選ぶ（v1 ではリストの一番上を採用で良い）。
-2. 検索実行
-   - Step 1 で特定した uri と position を使う。
+処理:
+
+1. 入力された query 文字列でプロジェクト全体を検索し、候補となる Location を取得する。
+2. 各 Location を LocationRef に変換し、ID を付与して返す。
+
+### 4.4 find の処理
+
+LSP の findReferences は「位置（行・列）」引数を要求します。
+
+1. ID 解析
+   - 入力された ID (filePath::line::character) からファイルパスと位置を復元する。
+2. 正確な位置の特定 (Refinement)
+   - LSP Method: textDocument/documentSymbol
+   - ID が指す行にあるシンボルを特定し、その `selectionRange` (識別子の正確な位置) を取得する。
+   - これにより、ID が多少ずれていても（行単位など）、正確な識別子の位置で検索を実行できる。
+3. 検索実行
+   - 特定した正確な位置を使う。
    - mode: "definition" → LSP textDocument/definition
    - mode: "reference" → LSP textDocument/references
-3. ID 生成
-   - 後続の inspect コマンドのために、返ってきた各 Location をシリアライズして ID 化する。
-   - Format: filePath::line::character
 
-### 4.4 inspect の処理
+### 4.5 inspect の処理
 
 LSP は「コードの中身」を返しません。Daemon が自分でファイルを読む必要があります。
 
