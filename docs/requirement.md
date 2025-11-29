@@ -166,22 +166,33 @@ LSP は「コードの中身」を返しません。Daemon が自分でファイ
 
 以下の順序で実装を進めてください。一気に全部作ろうとすると失敗します。
 
-### Phase 0: 疎通確認 (Proof of Concept)
+### Phase 0: 疎通確認 (Proof of Concept) [完了]
 
 Node.js スクリプトから typescript-language-server を spawn し、initialize を送ってレスポンスが返ってくることだけを確認する。
 
-### Phase 1: Daemon の骨格
+### Phase 1: Domain & UseCases (Clean Architecture) [完了]
 
-HTTP サーバーを立ち上げ、LSP プロセスを保持し続ける構造を作る。
+Clean Architecture に基づき、Domain Entities と UseCase を実装する。
+LSP への依存を抽象化し、テスト可能な構造を作る。
 
-### Phase 2: map_file の実装
+### Phase 2: Infrastructure (LSP Integration) [完了]
 
-ファイル構造の取得は最も簡単で、かつ「LSP がちゃんと動いているか」の確認に最適。
+実際に LSP プロセスと通信する Repository 実装を行う。
+`vscode-jsonrpc` を用いて `typescript-language-server` と通信する。
 
-### Phase 3: find (名前解決ロジック) の実装
+### Phase 3: Web Server (Daemon) [完了]
 
-workspace/symbol と findReferences を繋ぐロジックの実装。
+Fastify を用いて HTTP サーバーを実装し、UseCase を公開する。
+`/map`, `/find`, `/inspect` エンドポイントを実装する。
 
-### Phase 4: CLI クライアント
+### Phase 4: CLI クライアント [完了]
 
-最後に、Daemon に HTTP リクエストを投げるだけの薄い CLI を作る。
+Daemon に HTTP リクエストを投げる CLI を実装する。
+`cac` を使用し、`map`, `find`, `inspect` コマンドを提供する。
+
+### Phase 5: Lazy Start & Dynamic Port [完了]
+
+- **Lazy Start**: CLI 実行時にサーバーが起動していなければ自動的に起動する。
+- **Dynamic Port**: `portfinder` を用いて空きポートを動的に割り当て、`.code-nav-daemon.json` でポート番号を共有する。
+- **Lifecycle**: `stop` コマンドおよび `/shutdown` エンドポイントによるグレースフルシャットダウン。
+
