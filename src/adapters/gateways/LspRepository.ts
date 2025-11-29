@@ -52,16 +52,24 @@ export class LspRepository implements ILspRepository {
     await this.connection.sendNotification('initialized', {});
 
     // Force project loading by opening a source file
+    const tsFile = await this.findTsFile(rootPath);
+    if (tsFile) {
+      await this.openDocument(tsFile);
+    }
+  }
+
+  private async findTsFile(rootPath: string): Promise<string | null> {
     try {
       const srcPath = path.join(rootPath, 'src');
       const files = await fs.readdir(srcPath);
       const tsFile = files.find((f) => f.endsWith('.ts'));
       if (tsFile) {
-        await this.openDocument(path.join(srcPath, tsFile));
+        return path.join(srcPath, tsFile);
       }
-    } catch (e) {
+    } catch {
       // Ignore
     }
+    return null;
   }
 
   async shutdown(): Promise<void> {
@@ -198,6 +206,7 @@ export class LspRepository implements ILspRepository {
 
   private mapDocumentSymbol(symbol: lsp.DocumentSymbol, filePath: string): SymbolInfo {
     const kindString = Object.keys(lsp.SymbolKind).find(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (key) => (lsp.SymbolKind as any)[key] === symbol.kind,
     );
     // Create ID based on selectionRange (the identifier)
@@ -234,6 +243,7 @@ export class LspRepository implements ILspRepository {
 
   private mapSymbolInformation(symbol: lsp.SymbolInformation): LocationRef {
     const kindString = Object.keys(lsp.SymbolKind).find(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (key) => (lsp.SymbolKind as any)[key] === symbol.kind,
     );
     return {

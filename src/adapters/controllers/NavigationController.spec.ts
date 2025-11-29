@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { SymbolNotFoundError } from '../../domain/errors';
+import { AmbiguousSymbolError, SymbolNotFoundError } from '../../domain/errors';
 import { FindSymbolUseCase } from '../../usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from '../../usecases/InspectCodeUseCase';
 import { MapFileUseCase } from '../../usecases/MapFileUseCase';
@@ -31,6 +31,13 @@ describe('NavigationController', () => {
       status: jest.fn().mockReturnThis(),
       send: jest.fn().mockReturnThis(),
     } as unknown as jest.Mocked<FastifyReply>;
+
+    // Silence console.error during tests
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('mapFile', () => {
@@ -50,10 +57,92 @@ describe('NavigationController', () => {
       const req = { query: {} } as FastifyRequest<{ Querystring: { path: string } }>;
       await controller.mapFile(req, mockReply);
       expect(mockReply.status).toHaveBeenCalledWith(400);
+      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Missing path parameter' });
+    });
+
+    it('should handle generic errors', async () => {
+      const req = { query: { path: 'src/test.ts' } } as FastifyRequest<{
+        Querystring: { path: string };
+      }>;
+      mockMapFileUC.execute.mockRejectedValue(new Error('Something went wrong'));
+
+      await controller.mapFile(req, mockReply);
+
+      expect(mockReply.status).toHaveBeenCalledWith(500);
+      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Internal Server Error' });
+    });
+  });
+
+  describe('search', () => {
+    it('should return candidates on success', async () => {
+      const req = { query: { query: 'Test' } } as FastifyRequest<{
+        Querystring: { query: string };
+      }>;
+      const candidates = [
+        {
+          id: 'id1',
+          name: 'Test',
+          kind: 'Class',
+          line: 1,
+          filePath: 'src/test.ts',
+          character: 1,
+          preview: 'class Test',
+        },
+      ];
+      mockSearchSymbolUC.execute.mockResolvedValue(candidates);
+
+      await controller.search(req, mockReply);
+
+      expect(mockReply.send).toHaveBeenCalledWith({ candidates });
+    });
+
+    it('should return 400 if query is missing', async () => {
+      const req = { query: {} } as FastifyRequest<{ Querystring: { query: string } }>;
+      await controller.search(req, mockReply);
+      expect(mockReply.status).toHaveBeenCalledWith(400);
+      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Missing query parameter' });
+    });
+
+    it('should handle errors', async () => {
+      const req = { query: { query: 'Test' } } as FastifyRequest<{
+        Querystring: { query: string };
+      }>;
+      mockSearchSymbolUC.execute.mockRejectedValue(new Error('Error'));
+      await controller.search(req, mockReply);
+      expect(mockReply.status).toHaveBeenCalledWith(500);
     });
   });
 
   describe('find', () => {
+    it('should return result on success', async () => {
+      const req = { query: { id: 'id1' } } as FastifyRequest<{
+        Querystring: { id: string };
+      }>;
+      const result = {
+        definition: {
+          id: 'id1',
+          filePath: 'f',
+          line: 1,
+          character: 1,
+          kind: 'k',
+          preview: 'p',
+        },
+        references: [],
+      };
+      mockFindSymbolUC.execute.mockResolvedValue(result);
+
+      await controller.find(req, mockReply);
+
+      expect(mockReply.send).toHaveBeenCalledWith(result);
+    });
+
+    it('should return 400 if id is missing', async () => {
+      const req = { query: {} } as FastifyRequest<{ Querystring: { id: string } }>;
+      await controller.find(req, mockReply);
+      expect(mockReply.status).toHaveBeenCalledWith(400);
+      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Missing id parameter' });
+    });
+
     it('should return 404 if symbol not found', async () => {
       const req = { query: { id: 'Unknown' } } as FastifyRequest<{
         Querystring: { id: string };
@@ -64,6 +153,67 @@ describe('NavigationController', () => {
 
       expect(mockReply.status).toHaveBeenCalledWith(404);
       expect(mockReply.send).toHaveBeenCalledWith({ error: 'Symbol not found: Unknown' });
+    });
+
+    it('should return 300 if symbol is ambiguous', async () => {
+      const req = { query: { id: 'Ambiguous' } } as FastifyRequest<{
+        Querystring: { id: string };
+      }>;
+      const candidates = [
+        {
+          id: 'id1',
+          name: 'Test',
+          kind: 'Class',
+          line: 1,
+          filePath: 'src/test.ts',
+          character: 1,
+          preview: 'class Test',
+        },
+      ];
+      mockFindSymbolUC.execute.mockRejectedValue(new AmbiguousSymbolError('Ambiguous', candidates));
+
+      await controller.find(req, mockReply);
+
+      expect(mockReply.status).toHaveBeenCalledWith(300);
+      expect(mockReply.send).toHaveBeenCalledWith({
+        error: 'Multiple symbols found for: Ambiguous',
+        candidates,
+      });
+    });
+  });
+
+  describe('inspect', () => {
+    it('should return result on success', async () => {
+      const req = { query: { id: 'id1' } } as FastifyRequest<{
+        Querystring: { id: string; expand?: 'block' | 'surround' };
+      }>;
+      const result = {
+        filePath: 'f',
+        range: { startLine: 1, endLine: 2 },
+        code: 'code',
+        relatedSymbols: [],
+      };
+      mockInspectCodeUC.execute.mockResolvedValue(result);
+
+      await controller.inspect(req, mockReply);
+
+      expect(mockReply.send).toHaveBeenCalledWith({ result });
+    });
+
+    it('should return 400 if id is missing', async () => {
+      const req = { query: {} } as FastifyRequest<{ Querystring: { id: string } }>;
+      await controller.inspect(req, mockReply);
+      expect(mockReply.status).toHaveBeenCalledWith(400);
+      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Missing id parameter' });
+    });
+
+    it('should handle errors', async () => {
+      const req = { query: { id: 'id1' } } as FastifyRequest<{
+        Querystring: { id: string };
+      }>;
+      mockInspectCodeUC.execute.mockRejectedValue(new Error('Error'));
+      await controller.inspect(req, mockReply);
+      expect(mockReply.status).toHaveBeenCalledWith(500);
     });
   });
 });

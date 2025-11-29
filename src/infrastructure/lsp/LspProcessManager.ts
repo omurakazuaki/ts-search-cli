@@ -11,15 +11,7 @@ export class LspProcessManager {
       return;
     }
 
-    let serverPath: string;
-    try {
-      // Resolve the path to the server executable
-      // For typescript-language-server, we need to point to the cli.mjs or similar
-      // This might need adjustment based on the exact package structure
-      serverPath = require.resolve(`${this.serverName}/lib/cli.mjs`);
-    } catch (e) {
-      throw new Error(`Could not resolve server path for ${this.serverName}: ${e}`);
-    }
+    const serverPath = this.resolveServerPath();
 
     this.process = cp.spawn('node', [serverPath, '--stdio']);
 
@@ -28,11 +20,22 @@ export class LspProcessManager {
       this.process = null;
     });
 
-    this.process.stderr?.on('data', () => {
+    this.process.stderr?.on('data', (data) => {
       // Log server stderr for debugging
       // In production, might want to pipe to a logger
-      // console.error(`[LSP Stderr] ${data}`);
+      console.error(`[LSP Stderr] ${data}`);
     });
+  }
+
+  protected resolveServerPath(): string {
+    try {
+      // Resolve the path to the server executable
+      // For typescript-language-server, we need to point to the cli.mjs or similar
+      // This might need adjustment based on the exact package structure
+      return require.resolve(`${this.serverName}/lib/cli.mjs`);
+    } catch (e) {
+      throw new Error(`Could not resolve server path for ${this.serverName}: ${e}`);
+    }
   }
 
   stop(): void {
