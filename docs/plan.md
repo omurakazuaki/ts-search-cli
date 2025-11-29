@@ -39,18 +39,18 @@ _Goal: Implement application logic with Mock repositories. 100% Unit Test covera
   - Create `src/usecases/InspectCodeUseCase.ts`.
   - Create `src/usecases/InspectCodeUseCase.spec.ts`.
 
-## Phase 3: Infrastructure - LSP Integration (The Bridge)
+## Phase 3: Infrastructure - LSP Integration (The Bridge) (Completed)
 
 _Goal: Implement the actual communication with `typescript-language-server`._
 
-- [ ] **Task 3.1**: LSP Process Manager
+- [x] **Task 3.1**: LSP Process Manager
   - Create `src/infrastructure/lsp/LspProcessManager.ts` (Spawn, IPC).
   - Test: Verify process start/stop and stdio communication.
-- [ ] **Task 3.2**: LspRepository Implementation (Gateway)
+- [x] **Task 3.2**: LspRepository Implementation (Gateway)
   - Create `src/adapters/gateways/LspRepository.ts` implementing `ILspRepository`.
   - Implement JSON-RPC handling.
   - Implement error translation (LSP Error -> Domain Error).
-- [ ] **Task 3.3**: Integration Test
+- [x] **Task 3.3**: Integration Test
   - Verify `LspRepository` against a real `typescript-language-server` instance.
 
 ## Phase 4: Web Server & Adapters
