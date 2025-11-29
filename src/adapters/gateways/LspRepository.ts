@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as ts from 'typescript';
 import * as rpc from 'vscode-jsonrpc/node';
 import * as lsp from 'vscode-languageserver-protocol';
 import { LocationRef, SymbolInfo } from '../../domain/entities';
@@ -77,13 +78,31 @@ export class LspRepository implements ILspRepository {
     await this.connection.sendRequest('initialize', initParams);
     await this.connection.sendNotification('initialized', {});
 
-    // Force project loading by opening a source file
-    const tsFile = await this.findTsFile(rootPath);
-    if (tsFile) {
-      await this.openDocument(tsFile);
+    // Force project loading by opening ALL source files
+    // This ensures that even files excluded in tsconfig.json are loaded by the LSP
+    let scanDir = rootPath;
+    try {
+      const configPath = ts.findConfigFile(rootPath, ts.sys.fileExists, 'tsconfig.json');
+      if (configPath) {
+        const { config } = ts.readConfigFile(configPath, ts.sys.readFile);
+        if (config?.compilerOptions?.rootDir) {
+          scanDir = path.resolve(rootPath, config.compilerOptions.rootDir);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to read tsconfig.json, scanning project root:', error);
+    }
 
-      // Warm-up: Request document symbols
-      const absPath = path.resolve(tsFile);
+    const allTsFiles = await this.findAllTsFiles(scanDir);
+
+    if (allTsFiles.length > 0) {
+      // Open all files to force LSP to acknowledge them
+      for (const file of allTsFiles) {
+        await this.openDocument(file);
+      }
+
+      // Warm-up: Request document symbols for the first file
+      const absPath = path.resolve(allTsFiles[0]);
       const uri = `file://${absPath}`;
       try {
         await this.connection.sendRequest('textDocument/documentSymbol', {
@@ -107,18 +126,27 @@ export class LspRepository implements ILspRepository {
     }
   }
 
-  private async findTsFile(rootPath: string): Promise<string | null> {
+  private async findAllTsFiles(dir: string): Promise<string[]> {
+    let results: string[] = [];
     try {
-      const srcPath = path.join(rootPath, 'src');
-      const files = await fs.readdir(srcPath);
-      const tsFile = files.find((f) => f.endsWith('.ts'));
-      if (tsFile) {
-        return path.join(srcPath, tsFile);
+      const list = await fs.readdir(dir);
+      for (const file of list) {
+        const filePath = path.join(dir, file);
+        const stat = await fs.stat(filePath);
+        if (stat && stat.isDirectory()) {
+          if (file !== 'node_modules' && file !== '.git') {
+            results = results.concat(await this.findAllTsFiles(filePath));
+          }
+        } else {
+          if (file.endsWith('.ts') || file.endsWith('.tsx')) {
+            results.push(filePath);
+          }
+        }
       }
-    } catch {
-      // Ignore
+    } catch (e) {
+      console.warn(`Failed to read directory ${dir}: ${e}`);
     }
-    return null;
+    return results;
   }
 
   async shutdown(): Promise<void> {
