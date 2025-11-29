@@ -49,6 +49,7 @@ export class FindSymbolUseCase {
       }
     } catch (e) {
       // Fallback to using the ID coordinates directly
+      console.warn(`Failed to get document symbols for ${filePath}:`, e);
     }
 
     // 2. Find references

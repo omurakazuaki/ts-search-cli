@@ -20,15 +20,6 @@ describe('FindSymbolUseCase', () => {
   });
 
   it('should return definition and references when symbol is found', async () => {
-    const definition: LocationRef = {
-      id: 'src/test.ts::10::5',
-      filePath: 'src/test.ts',
-      line: 10,
-      character: 5,
-      kind: 'Class',
-      preview: 'class Test {}',
-    };
-
     const references: LocationRef[] = [
       {
         id: 'ref-id',

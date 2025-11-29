@@ -5,9 +5,11 @@ import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as net from 'net';
 import * as path from 'path';
+import { CliPresenter } from './adapters/presenters/CliPresenter';
 
 const cli = cac('ts-search');
 const DAEMON_FILE = '.ts-search-daemon.json';
+const presenter = new CliPresenter();
 
 async function getDaemonInfo(): Promise<{ port: number; pid: number } | null> {
   try {
@@ -103,55 +105,67 @@ function handleError(error: unknown) {
 
 // Wrap action to ensure server is running
 const withServer =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (action: (baseUrl: string, ...args: any[]) => Promise<void>) =>
-  async (...args: any[]) => {
-    try {
-      const port = await ensureServerRunning();
-      const baseUrl = `http://localhost:${port}`;
-      await action(baseUrl, ...args);
-    } catch (error) {
-      handleError(error);
-    }
-  };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async (...args: any[]) => {
+      try {
+        const port = await ensureServerRunning();
+        const baseUrl = `http://localhost:${port}`;
+        await action(baseUrl, ...args);
+      } catch (error) {
+        handleError(error);
+      }
+    };
 
-cli.command('map <file>', 'Map symbols in a file').action(
-  withServer(async (baseUrl, file) => {
-    const response = await axios.get(`${baseUrl}/map`, {
-      params: { path: file },
-    });
-    console.log(JSON.stringify(response.data, null, 2));
-  }),
-);
+cli
+  .command('map <file>', 'Map symbols in a file')
+  .option('--table', 'Output in table format')
+  .action(
+    withServer(async (baseUrl, file, options) => {
+      const response = await axios.get(`${baseUrl}/map`, {
+        params: { path: file },
+      });
+      presenter.present(response.data.symbols, options);
+    }),
+  );
 
-cli.command('search <query>', 'Search for symbols by name').action(
-  withServer(async (baseUrl, query) => {
-    const response = await axios.get(`${baseUrl}/search`, {
-      params: { query },
-    });
-    console.log(JSON.stringify(response.data, null, 2));
-  }),
-);
+cli
+  .command('search <query>', 'Search for symbols by name')
+  .option('--table', 'Output in table format')
+  .action(
+    withServer(async (baseUrl, query, options) => {
+      const response = await axios.get(`${baseUrl}/search`, {
+        params: { query },
+      });
+      presenter.present(response.data.candidates, options);
+    }),
+  );
 
-cli.command('find <id>', 'Find definition and references by ID').action(
-  withServer(async (baseUrl, id) => {
-    const response = await axios.get(`${baseUrl}/find`, {
-      params: { id },
-    });
-    console.log(JSON.stringify(response.data, null, 2));
-  }),
-);
+cli
+  .command('find <id>', 'Find definition and references by ID')
+  .option('--table', 'Output in table format')
+  .action(
+    withServer(async (baseUrl, id, options) => {
+      const response = await axios.get(`${baseUrl}/find`, {
+        params: { id },
+      });
+      presenter.present(response.data, options);
+    }),
+  );
 
 cli
   .command('inspect <id>', 'Inspect a symbol by ID')
   .option('--expand <mode>', 'Expansion mode (block, file, none)', {
     default: 'block',
   })
+  .option('--table', 'Output in table format')
   .action(
     withServer(async (baseUrl, id, options) => {
       const response = await axios.get(`${baseUrl}/inspect`, {
         params: { id, expand: options.expand },
       });
-      console.log(JSON.stringify(response.data, null, 2));
+      presenter.present(response.data.result, options);
     }),
   );
 

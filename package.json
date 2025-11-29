@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",
-    "start": "ts-node src/main.ts",
+    "cli": "ts-node src/cli.ts",
     "test": "jest",
     "coverage": "jest --coverage",
     "lint": "eslint \"{src,.}/**/*.ts\" --fix",
@@ -16,6 +16,7 @@
   "dependencies": {
     "axios": "^1.13.2",
     "cac": "^6.7.14",
+    "cli-table3": "^0.6.5",
     "fastify": "^5.6.2",
     "portfinder": "^1.0.38",
     "typescript": "^5.0.0",
