@@ -1,9 +1,9 @@
-import { NavigationController } from './NavigationController';
-import { MapFileUseCase } from '../../usecases/MapFileUseCase';
+import { FastifyReply, FastifyRequest } from 'fastify';
+import { SymbolNotFoundError } from '../../domain/errors';
 import { FindSymbolUseCase } from '../../usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from '../../usecases/InspectCodeUseCase';
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { SymbolNotFoundError } from '../../domain/errors';
+import { MapFileUseCase } from '../../usecases/MapFileUseCase';
+import { NavigationController } from './NavigationController';
 
 describe('NavigationController', () => {
   let controller: NavigationController;

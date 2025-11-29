@@ -1,8 +1,8 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { MapFileUseCase } from '../../usecases/MapFileUseCase';
+import { FastifyReply, FastifyRequest } from 'fastify';
+import { AmbiguousSymbolError, SymbolNotFoundError } from '../../domain/errors';
 import { FindSymbolUseCase } from '../../usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from '../../usecases/InspectCodeUseCase';
-import { SymbolNotFoundError, AmbiguousSymbolError } from '../../domain/errors';
+import { MapFileUseCase } from '../../usecases/MapFileUseCase';
 
 export class NavigationController {
   constructor(
