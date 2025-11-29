@@ -38,7 +38,7 @@ line 6`;
     ]);
 
     // ID for line 4 (inside function)
-    const id = `${filePath}::4::10`;
+    const id = `${filePath}:4:10`;
     const result = await useCase.execute(id, 'block');
 
     expect(result.filePath).toBe(filePath);
@@ -55,7 +55,7 @@ line 6`;
     mockFileRepo.readFile.mockResolvedValue(fileContent);
     mockLspRepo.getFoldingRanges.mockResolvedValue([]);
 
-    const id = `${filePath}::10::1`;
+    const id = `${filePath}:10:1`;
     const result = await useCase.execute(id, 'block');
 
     expect(result.range).toEqual({ startLine: 5, endLine: 15 });

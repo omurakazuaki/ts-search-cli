@@ -30,7 +30,7 @@ describe('FindSymbolUseCase', () => {
         preview: 'const t = new Test();',
       },
       {
-        id: 'src/test.ts::10::5',
+        id: 'src/test.ts:10:5',
         filePath: 'src/test.ts',
         line: 10,
         character: 5,
@@ -42,7 +42,7 @@ describe('FindSymbolUseCase', () => {
     // Mock getDocumentSymbols to return a symbol that matches the ID
     mockRepo.getDocumentSymbols.mockResolvedValue([
       {
-        id: 'src/test.ts::10::5',
+        id: 'src/test.ts:10:5',
         name: 'Test',
         kind: 'Class',
         line: 10,
@@ -58,14 +58,14 @@ describe('FindSymbolUseCase', () => {
     ]);
     mockRepo.getReferences.mockResolvedValue(references);
 
-    const result = await useCase.execute('src/test.ts::10::5');
+    const result = await useCase.execute('src/test.ts:10:5');
 
     expect(result).toHaveLength(2);
     const def = result.find((r) => r.role === 'definition');
     const ref = result.find((r) => r.role === 'reference');
 
     expect(def).toBeDefined();
-    expect(def?.id).toBe('src/test.ts::10::5');
+    expect(def?.id).toBe('src/test.ts:10:5');
     expect(def?.kind).toBe('Class'); // Should be updated from symbol info
 
     expect(ref).toBeDefined();
@@ -108,7 +108,7 @@ describe('FindSymbolUseCase', () => {
     ]);
     mockRepo.getReferences.mockResolvedValue([]);
 
-    const result = await useCase.execute('src/test.ts::12::5');
+    const result = await useCase.execute('src/test.ts:12:5');
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('nested');

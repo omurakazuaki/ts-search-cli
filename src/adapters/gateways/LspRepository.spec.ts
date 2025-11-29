@@ -1,27 +1,29 @@
 import * as fs from 'fs/promises';
-import { glob } from 'glob';
+import { PassThrough } from 'stream';
 import * as rpc from 'vscode-jsonrpc/node';
 import * as lsp from 'vscode-languageserver-protocol';
+import { ProjectFileScanner } from '../../infrastructure/file/ProjectFileScanner';
 import { LspProcessManager } from '../../infrastructure/lsp/LspProcessManager';
 import { LspRepository } from './LspRepository';
 
 jest.mock('fs/promises');
 jest.mock('vscode-jsonrpc/node');
 jest.mock('../../infrastructure/lsp/LspProcessManager');
-jest.mock('glob');
+jest.mock('../../infrastructure/file/ProjectFileScanner');
 
 describe('LspRepository', () => {
   let repository: LspRepository;
   let mockProcessManager: jest.Mocked<LspProcessManager>;
   let mockConnection: jest.Mocked<rpc.MessageConnection>;
+  let mockScan: jest.Mock;
 
   beforeEach(() => {
     mockProcessManager = new LspProcessManager() as jest.Mocked<LspProcessManager>;
     Object.defineProperty(mockProcessManager, 'stdout', {
-      get: jest.fn().mockReturnValue({} as any),
+      get: jest.fn().mockReturnValue(new PassThrough()),
     });
     Object.defineProperty(mockProcessManager, 'stdin', {
-      get: jest.fn().mockReturnValue({} as any),
+      get: jest.fn().mockReturnValue(new PassThrough()),
     });
     mockProcessManager.start = jest.fn();
     mockProcessManager.stop = jest.fn();
@@ -36,7 +38,11 @@ describe('LspRepository', () => {
     } as unknown as jest.Mocked<rpc.MessageConnection>;
 
     (rpc.createMessageConnection as jest.Mock).mockReturnValue(mockConnection);
-    (glob as unknown as jest.Mock).mockResolvedValue([]);
+
+    mockScan = jest.fn().mockResolvedValue([]);
+    (ProjectFileScanner as jest.Mock).mockImplementation(() => ({
+      scan: mockScan,
+    }));
 
     repository = new LspRepository(mockProcessManager);
   });
@@ -55,13 +61,27 @@ describe('LspRepository', () => {
     });
 
     it('should start process and initialize connection', async () => {
-      (fs.readdir as jest.Mock).mockResolvedValue(['test.ts']);
+      mockScan.mockResolvedValue(['test.ts']);
       (fs.readFile as jest.Mock).mockResolvedValue('content');
 
       const initPromise = repository.initialize();
 
+      // Allow async operations to proceed to the point of setTimeout
+      // We need to flush promises multiple times to get past all the awaits in initialize
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
       // Fast-forward through the initial waits
-      await jest.runAllTimersAsync();
+      jest.advanceTimersByTime(500);
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      jest.advanceTimersByTime(1000);
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
 
       await initPromise;
 
@@ -81,7 +101,7 @@ describe('LspRepository', () => {
     });
 
     it('should wait for indexing to complete if progress notification is received', async () => {
-      (fs.readdir as jest.Mock).mockResolvedValue(['test.ts']);
+      mockScan.mockResolvedValue(['test.ts']);
       (fs.readFile as jest.Mock).mockResolvedValue('content');
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,9 +114,8 @@ describe('LspRepository', () => {
 
       const initPromise = repository.initialize();
 
-      // Allow async operations to proceed until the first timer
-      // We need enough ticks to reach the 500ms wait inside initialize
-      for (let i = 0; i < 50; i++) {
+      // Wait for handler registration
+      for (let i = 0; i < 20; i++) {
         await Promise.resolve();
       }
 
@@ -110,8 +129,9 @@ describe('LspRepository', () => {
 
       // Advance time to finish the 500ms wait
       jest.advanceTimersByTime(500);
-      await Promise.resolve();
-      await Promise.resolve();
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
 
       // Now it should be waiting for the 'end' notification or 30s timeout.
       // Trigger 'end' notification
@@ -132,17 +152,42 @@ describe('LspRepository', () => {
     });
 
     it('should handle errors during file opening', async () => {
-      (fs.readdir as jest.Mock).mockRejectedValue(new Error('Error'));
+      mockScan.mockResolvedValue(['test.ts']);
+      (fs.readFile as jest.Mock).mockRejectedValue(new Error('Error'));
       const initPromise = repository.initialize();
-      await jest.runAllTimersAsync();
+
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      jest.advanceTimersByTime(500);
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+      jest.advanceTimersByTime(1000);
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
       await initPromise;
       // Should not throw
     });
 
     it('should not open document if no ts file found', async () => {
-      (fs.readdir as jest.Mock).mockResolvedValue(['readme.md']);
+      mockScan.mockResolvedValue([]);
       const initPromise = repository.initialize();
-      await jest.runAllTimersAsync();
+
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      jest.advanceTimersByTime(500);
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+      jest.advanceTimersByTime(1000);
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
       await initPromise;
       expect(mockConnection.sendNotification).not.toHaveBeenCalledWith(
         'textDocument/didOpen',

@@ -66,13 +66,13 @@ export class InspectCodeUseCase {
   }
 
   private parseId(id: string): { filePath: string; line: number; character: number } {
-    const parts = id.split('::');
+    const parts = id.split(':');
     if (parts.length < 3) {
       throw new Error(`Invalid ID format: ${id}`);
     }
     const character = parseInt(parts.pop()!, 10);
     const line = parseInt(parts.pop()!, 10);
-    const filePath = parts.join('::'); // Rejoin the rest as file path
+    const filePath = parts.join(':'); // Rejoin the rest as file path
 
     return { filePath, line, character };
   }

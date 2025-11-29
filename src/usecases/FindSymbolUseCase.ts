@@ -83,7 +83,7 @@ export class FindSymbolUseCase {
   }
 
   private parseId(id: string): { filePath: string; line: number; character: number } {
-    const parts = id.split('::');
+    const parts = id.split(':');
     if (parts.length !== 3) {
       throw new Error(`Invalid ID format: ${id}`);
     }
