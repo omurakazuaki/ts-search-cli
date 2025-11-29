@@ -124,6 +124,16 @@ cli
     }),
   );
 
+cli.command('stop', 'Stop the background server').action(async () => {
+  try {
+    await axios.post(`${BASE_URL}/shutdown`, {});
+    console.log('Server stopping...');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.log('Server is not running or failed to stop.', msg);
+  }
+});
+
 cli.help();
 cli.version('0.1.0');
 

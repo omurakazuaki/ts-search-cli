@@ -8,6 +8,10 @@ export function createServer(controller: NavigationController): FastifyInstance 
   server.get('/find', controller.find.bind(controller));
   server.get('/inspect', controller.inspect.bind(controller));
   server.get('/health', async () => ({ status: 'ok' }));
+  server.post('/shutdown', async () => {
+    setTimeout(() => process.kill(process.pid, 'SIGTERM'), 200);
+    return { status: 'shutting down' };
+  });
 
   return server;
 }
