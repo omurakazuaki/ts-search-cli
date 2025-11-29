@@ -1,3 +1,6 @@
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as portfinder from 'portfinder';
 import { NavigationController } from './adapters/controllers/NavigationController';
 import { FsRepository } from './adapters/gateways/FsRepository';
 import { LspRepository } from './adapters/gateways/LspRepository';
@@ -7,12 +10,12 @@ import { FindSymbolUseCase } from './usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from './usecases/InspectCodeUseCase';
 import { MapFileUseCase } from './usecases/MapFileUseCase';
 
+const DAEMON_FILE = '.code-nav-daemon.json';
+
 async function bootstrap() {
   try {
     // 1. Infrastructure (Drivers)
     const lspProcess = new LspProcessManager();
-    // Note: We don't start the process here explicitly if LspRepository handles it,
-    // but LspRepository.initialize() calls start().
 
     // 2. Adapters (Interface Adapters)
     const lspRepo = new LspRepository(lspProcess);
@@ -33,14 +36,25 @@ async function bootstrap() {
 
     // 5. Server
     const server = createServer(controller);
-    const port = 3000;
 
-    await server.listen({ port, host: '0.0.0.0' });
+    // Find a free port
+    const port = await portfinder.getPortPromise({ port: 3000 });
+
+    await server.listen({ port, host: '127.0.0.1' });
     console.log(`Server listening on http://localhost:${port}`);
+
+    // Write daemon info
+    const daemonInfo = { port, pid: process.pid };
+    await fs.writeFile(path.resolve(process.cwd(), DAEMON_FILE), JSON.stringify(daemonInfo));
 
     // Graceful shutdown
     const shutdown = async () => {
       console.log('Shutting down...');
+      try {
+        await fs.unlink(path.resolve(process.cwd(), DAEMON_FILE));
+      } catch {
+        // Ignore if file already gone
+      }
       await server.close();
       await lspRepo.shutdown();
       process.exit(0);

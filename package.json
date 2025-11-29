@@ -12,6 +12,7 @@
     "axios": "^1.13.2",
     "cac": "^6.7.14",
     "fastify": "^5.6.2",
+    "portfinder": "^1.0.38",
     "typescript": "^5.0.0",
     "typescript-language-server": "^4.0.0",
     "vscode-jsonrpc": "^8.2.0",

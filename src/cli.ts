@@ -2,11 +2,21 @@
 import axios from 'axios';
 import cac from 'cac';
 import { spawn } from 'child_process';
+import * as fs from 'fs/promises';
 import * as net from 'net';
 import * as path from 'path';
 
 const cli = cac('code-nav');
-const BASE_URL = 'http://localhost:3000';
+const DAEMON_FILE = '.code-nav-daemon.json';
+
+async function getDaemonInfo(): Promise<{ port: number; pid: number } | null> {
+  try {
+    const content = await fs.readFile(path.resolve(process.cwd(), DAEMON_FILE), 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
 
 async function isServerRunning(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -27,28 +37,38 @@ async function isServerRunning(port: number): Promise<boolean> {
   });
 }
 
-async function waitForServer(retries = 20, delay = 1000): Promise<void> {
+async function waitForServer(retries = 20, delay = 1000): Promise<number> {
   for (let i = 0; i < retries; i++) {
-    try {
-      await axios.get(`${BASE_URL}/health`);
-      return;
-    } catch {
-      await new Promise((r) => setTimeout(r, delay));
+    const info = await getDaemonInfo();
+    if (info) {
+      try {
+        await axios.get(`http://localhost:${info.port}/health`);
+        return info.port;
+      } catch {
+        // Server might be starting up
+      }
     }
+    await new Promise((r) => setTimeout(r, delay));
   }
   throw new Error('Server failed to start within timeout');
 }
 
-async function ensureServerRunning() {
-  if (await isServerRunning(3000)) {
-    return;
+async function ensureServerRunning(): Promise<number> {
+  const info = await getDaemonInfo();
+  if (info) {
+    if (await isServerRunning(info.port)) {
+      return info.port;
+    }
+    // Stale file, remove it
+    try {
+      await fs.unlink(path.resolve(process.cwd(), DAEMON_FILE));
+    } catch {
+      // Ignore
+    }
   }
 
   console.error('Server not running. Starting server...');
 
-  // Determine the path to the main script
-  // In dev: src/main.ts (via ts-node)
-  // In prod: dist/main.js (via node)
   const isTs = __filename.endsWith('.ts');
   const scriptPath = isTs
     ? path.join(__dirname, 'main.ts')
@@ -65,8 +85,9 @@ async function ensureServerRunning() {
 
   child.unref();
 
-  await waitForServer();
-  console.error('Server started.');
+  const port = await waitForServer();
+  console.error(`Server started on port ${port}.`);
+  return port;
 }
 
 function handleError(error: unknown) {
@@ -82,19 +103,20 @@ function handleError(error: unknown) {
 
 // Wrap action to ensure server is running
 const withServer =
-  (action: (...args: any[]) => Promise<void>) =>
+  (action: (baseUrl: string, ...args: any[]) => Promise<void>) =>
   async (...args: any[]) => {
     try {
-      await ensureServerRunning();
-      await action(...args);
+      const port = await ensureServerRunning();
+      const baseUrl = `http://localhost:${port}`;
+      await action(baseUrl, ...args);
     } catch (error) {
       handleError(error);
     }
   };
 
 cli.command('map <file>', 'Map symbols in a file').action(
-  withServer(async (file) => {
-    const response = await axios.get(`${BASE_URL}/map`, {
+  withServer(async (baseUrl, file) => {
+    const response = await axios.get(`${baseUrl}/map`, {
       params: { path: file },
     });
     console.log(JSON.stringify(response.data, null, 2));
@@ -102,8 +124,8 @@ cli.command('map <file>', 'Map symbols in a file').action(
 );
 
 cli.command('find <query>', 'Find a symbol by query').action(
-  withServer(async (query) => {
-    const response = await axios.get(`${BASE_URL}/find`, {
+  withServer(async (baseUrl, query) => {
+    const response = await axios.get(`${baseUrl}/find`, {
       params: { query },
     });
     console.log(JSON.stringify(response.data, null, 2));
@@ -116,8 +138,8 @@ cli
     default: 'block',
   })
   .action(
-    withServer(async (id, options) => {
-      const response = await axios.get(`${BASE_URL}/inspect`, {
+    withServer(async (baseUrl, id, options) => {
+      const response = await axios.get(`${baseUrl}/inspect`, {
         params: { id, expand: options.expand },
       });
       console.log(JSON.stringify(response.data, null, 2));
@@ -126,7 +148,13 @@ cli
 
 cli.command('stop', 'Stop the background server').action(async () => {
   try {
-    await axios.post(`${BASE_URL}/shutdown`, {});
+    const info = await getDaemonInfo();
+    if (!info) {
+      console.log('Server is not running (no daemon file).');
+      return;
+    }
+    const baseUrl = `http://localhost:${info.port}`;
+    await axios.post(`${baseUrl}/shutdown`, {});
     console.log('Server stopping...');
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
