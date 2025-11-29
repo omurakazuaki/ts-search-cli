@@ -50,6 +50,18 @@ export class LspRepository implements ILspRepository {
 
     await this.connection.sendRequest('initialize', initParams);
     await this.connection.sendNotification('initialized', {});
+
+    // Force project loading by opening a source file
+    try {
+      const srcPath = path.join(rootPath, 'src');
+      const files = await fs.readdir(srcPath);
+      const tsFile = files.find((f) => f.endsWith('.ts'));
+      if (tsFile) {
+        await this.openDocument(path.join(srcPath, tsFile));
+      }
+    } catch (e) {
+      // Ignore
+    }
   }
 
   async shutdown(): Promise<void> {
@@ -192,6 +204,26 @@ export class LspRepository implements ILspRepository {
       name: symbol.name,
       kind: kindString || 'Unknown',
       line: symbol.range.start.line + 1,
+      range: {
+        start: {
+          line: symbol.range.start.line + 1,
+          character: symbol.range.start.character + 1,
+        },
+        end: {
+          line: symbol.range.end.line + 1,
+          character: symbol.range.end.character + 1,
+        },
+      },
+      selectionRange: {
+        start: {
+          line: symbol.selectionRange.start.line + 1,
+          character: symbol.selectionRange.start.character + 1,
+        },
+        end: {
+          line: symbol.selectionRange.end.line + 1,
+          character: symbol.selectionRange.end.character + 1,
+        },
+      },
       children: symbol.children?.map((c) => this.mapDocumentSymbol(c)),
     };
   }

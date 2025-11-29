@@ -18,5 +18,13 @@ export interface SymbolInfo {
   name: string;
   kind: string;
   line: number;
+  range?: {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+  };
+  selectionRange?: {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+  };
   children?: SymbolInfo[];
 }
