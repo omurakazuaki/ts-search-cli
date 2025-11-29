@@ -1,3 +1,4 @@
+import ignore from 'ignore';
 import * as path from 'path';
 import * as ts from 'typescript';
 import * as rpc from 'vscode-jsonrpc/node';
@@ -93,7 +94,17 @@ export class LspRepository implements ILspRepository {
       console.warn('Failed to read tsconfig.json, scanning project root:', error);
     }
 
-    const allTsFiles = await this.findAllTsFiles(scanDir);
+    // Read .gitignore
+    const ig = ignore();
+    try {
+      const gitignorePath = path.join(rootPath, '.gitignore');
+      const gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
+      ig.add(gitignoreContent);
+    } catch {
+      // ignore if .gitignore doesn't exist
+    }
+
+    const allTsFiles = await this.findAllTsFiles(scanDir, ig, rootPath);
 
     if (allTsFiles.length > 0) {
       // Open all files to force LSP to acknowledge them
@@ -126,16 +137,29 @@ export class LspRepository implements ILspRepository {
     }
   }
 
-  private async findAllTsFiles(dir: string): Promise<string[]> {
+  private async findAllTsFiles(
+    dir: string,
+    ig?: ReturnType<typeof ignore>,
+    rootPath?: string,
+  ): Promise<string[]> {
     let results: string[] = [];
     try {
       const list = await fs.readdir(dir);
       for (const file of list) {
         const filePath = path.join(dir, file);
+
+        // Check ignore
+        if (ig && rootPath) {
+          const relativePath = path.relative(rootPath, filePath);
+          if (relativePath && ig.ignores(relativePath)) {
+            continue;
+          }
+        }
+
         const stat = await fs.stat(filePath);
         if (stat && stat.isDirectory()) {
           if (file !== 'node_modules' && file !== '.git') {
-            results = results.concat(await this.findAllTsFiles(filePath));
+            results = results.concat(await this.findAllTsFiles(filePath, ig, rootPath));
           }
         } else {
           if (file.endsWith('.ts') || file.endsWith('.tsx')) {
