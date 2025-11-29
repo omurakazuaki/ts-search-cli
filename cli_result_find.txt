@@ -1,0 +1,12 @@
+Starting CLI...
+{
+  "definition": {
+    "id": "/home/omura/work/2025/11/29/code-semantic-search/src/adapters/gateways/LspRepository.integration.spec.ts::32::11",
+    "filePath": "/home/omura/work/2025/11/29/code-semantic-search/src/adapters/gateways/LspRepository.integration.spec.ts",
+    "line": 32,
+    "character": 11,
+    "kind": "Constant",
+    "preview": "locationRef"
+  },
+  "references": []
+}

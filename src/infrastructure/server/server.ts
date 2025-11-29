@@ -7,6 +7,7 @@ export function createServer(controller: NavigationController): FastifyInstance 
   server.get('/map', controller.mapFile.bind(controller));
   server.get('/find', controller.find.bind(controller));
   server.get('/inspect', controller.inspect.bind(controller));
+  server.get('/health', async () => ({ status: 'ok' }));
 
   return server;
 }

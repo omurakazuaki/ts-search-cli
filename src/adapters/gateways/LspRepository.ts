@@ -63,19 +63,9 @@ export class LspRepository implements ILspRepository {
   async getDocumentSymbols(filePath: string): Promise<SymbolInfo[]> {
     this.ensureConnected();
 
+    await this.openDocument(filePath);
     const absPath = path.resolve(filePath);
     const uri = `file://${absPath}`;
-    const text = await fs.readFile(absPath, 'utf-8');
-
-    // Open the file first (virtual open)
-    await this.connection!.sendNotification('textDocument/didOpen', {
-      textDocument: {
-        uri,
-        languageId: 'typescript',
-        version: 1,
-        text,
-      },
-    });
 
     const params: lsp.DocumentSymbolParams = {
       textDocument: { uri },
@@ -153,6 +143,7 @@ export class LspRepository implements ILspRepository {
 
   async getFoldingRanges(filePath: string): Promise<{ startLine: number; endLine: number }[]> {
     this.ensureConnected();
+    await this.openDocument(filePath);
     const uri = `file://${path.resolve(filePath)}`;
 
     const params: lsp.FoldingRangeParams = {
@@ -170,6 +161,21 @@ export class LspRepository implements ILspRepository {
       startLine: r.startLine + 1, // Convert to 1-based
       endLine: r.endLine + 1,
     }));
+  }
+
+  private async openDocument(filePath: string): Promise<void> {
+    const absPath = path.resolve(filePath);
+    const uri = `file://${absPath}`;
+    const text = await fs.readFile(absPath, 'utf-8');
+
+    await this.connection!.sendNotification('textDocument/didOpen', {
+      textDocument: {
+        uri,
+        languageId: 'typescript',
+        version: 1,
+        text,
+      },
+    });
   }
 
   private ensureConnected() {
