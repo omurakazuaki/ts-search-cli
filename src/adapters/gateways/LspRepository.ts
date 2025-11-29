@@ -1,3 +1,4 @@
+import { glob } from 'glob';
 import ignore from 'ignore';
 import * as path from 'path';
 import * as ts from 'typescript';
@@ -94,14 +95,54 @@ export class LspRepository implements ILspRepository {
       console.warn('Failed to read tsconfig.json, scanning project root:', error);
     }
 
-    // Read .gitignore
+    // Read all .gitignore files
     const ig = ignore();
     try {
-      const gitignorePath = path.join(rootPath, '.gitignore');
-      const gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
-      ig.add(gitignoreContent);
-    } catch {
-      // ignore if .gitignore doesn't exist
+      const gitignoreFiles = await glob('**/.gitignore', {
+        cwd: rootPath,
+        ignore: 'node_modules/**',
+      });
+
+      // Sort by path length to process root first (though ignore package handles order)
+      gitignoreFiles.sort((a, b) => a.length - b.length);
+
+      for (const gitignoreFile of gitignoreFiles) {
+        const gitignorePath = path.join(rootPath, gitignoreFile);
+        const gitignoreDir = path.dirname(gitignoreFile);
+        const content = await fs.readFile(gitignorePath, 'utf-8');
+
+        // If it's in a subdirectory, we need to prefix the rules?
+        // Actually, ignore package doesn't support scoped rules easily.
+        // But we can add rules with prefix.
+        // e.g. if .gitignore is in src/, and has *.log
+        // we add src/*.log
+
+        if (gitignoreDir === '.') {
+          ig.add(content);
+        } else {
+          const lines = content.split(/\r?\n/);
+          const prefixedLines = lines.map((line) => {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) return line;
+
+            const isNegated = trimmed.startsWith('!');
+            const pattern = isNegated ? trimmed.slice(1) : trimmed;
+
+            // Handle root-relative patterns (starting with /)
+            const isRootRelative = pattern.startsWith('/');
+            const cleanPattern = isRootRelative ? pattern.slice(1) : pattern;
+
+            // Join with directory
+            // Note: ignore package expects forward slashes
+            const prefixed = path.posix.join(gitignoreDir.split(path.sep).join('/'), cleanPattern);
+
+            return isNegated ? `!${prefixed}` : prefixed;
+          });
+          ig.add(prefixedLines);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to process .gitignore files:', e);
     }
 
     const allTsFiles = await this.findAllTsFiles(scanDir, ig, rootPath);

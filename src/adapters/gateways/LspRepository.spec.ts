@@ -1,4 +1,5 @@
 import * as fs from 'fs/promises';
+import { glob } from 'glob';
 import * as rpc from 'vscode-jsonrpc/node';
 import * as lsp from 'vscode-languageserver-protocol';
 import { LspProcessManager } from '../../infrastructure/lsp/LspProcessManager';
@@ -7,6 +8,7 @@ import { LspRepository } from './LspRepository';
 jest.mock('fs/promises');
 jest.mock('vscode-jsonrpc/node');
 jest.mock('../../infrastructure/lsp/LspProcessManager');
+jest.mock('glob');
 
 describe('LspRepository', () => {
   let repository: LspRepository;
@@ -34,6 +36,7 @@ describe('LspRepository', () => {
     } as unknown as jest.Mocked<rpc.MessageConnection>;
 
     (rpc.createMessageConnection as jest.Mock).mockReturnValue(mockConnection);
+    (glob as unknown as jest.Mock).mockResolvedValue([]);
 
     repository = new LspRepository(mockProcessManager);
   });
