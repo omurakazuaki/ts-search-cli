@@ -29,6 +29,14 @@ describe('FindSymbolUseCase', () => {
         kind: 'Variable',
         preview: 'const t = new Test();',
       },
+      {
+        id: 'src/test.ts::10::5',
+        filePath: 'src/test.ts',
+        line: 10,
+        character: 5,
+        kind: 'Reference',
+        preview: '',
+      },
     ];
 
     // Mock getDocumentSymbols to return a symbol that matches the ID
@@ -52,8 +60,17 @@ describe('FindSymbolUseCase', () => {
 
     const result = await useCase.execute('src/test.ts::10::5');
 
-    expect(result.definition.id).toBe('src/test.ts::10::5');
-    expect(result.references).toBe(references);
+    expect(result).toHaveLength(2);
+    const def = result.find((r) => r.role === 'definition');
+    const ref = result.find((r) => r.role === 'reference');
+
+    expect(def).toBeDefined();
+    expect(def?.id).toBe('src/test.ts::10::5');
+    expect(def?.kind).toBe('Class'); // Should be updated from symbol info
+
+    expect(ref).toBeDefined();
+    expect(ref?.id).toBe('ref-id');
+
     expect(mockRepo.getDocumentSymbols).toHaveBeenCalledWith('src/test.ts');
     expect(mockRepo.getReferences).toHaveBeenCalledWith('src/test.ts', 10, 5);
   });
@@ -93,6 +110,8 @@ describe('FindSymbolUseCase', () => {
 
     const result = await useCase.execute('src/test.ts::12::5');
 
-    expect(result.definition.id).toBe('nested');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('nested');
+    expect(result[0].role).toBe('definition');
   });
 });

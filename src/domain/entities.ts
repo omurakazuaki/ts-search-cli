@@ -5,6 +5,7 @@ export interface LocationRef {
   character: number; // 1-based
   kind: string; // Function, Class, etc.
   preview: string; // Trimmed line content
+  role?: 'definition' | 'reference';
 }
 
 export interface CodeContext {

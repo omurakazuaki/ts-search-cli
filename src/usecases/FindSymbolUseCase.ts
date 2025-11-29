@@ -1,10 +1,7 @@
 import { LocationRef, SymbolInfo } from '../domain/entities';
 import { ILspRepository } from './ports/ILspRepository';
 
-export interface FindSymbolResult {
-  definition: LocationRef;
-  references: LocationRef[];
-}
+export type FindSymbolResult = LocationRef[];
 
 export class FindSymbolUseCase {
   constructor(private readonly lspRepo: ILspRepository) {}
@@ -55,10 +52,34 @@ export class FindSymbolUseCase {
     // 2. Find references
     const references = await this.lspRepo.getReferences(filePath, searchLine, searchChar);
 
-    return {
-      definition,
-      references,
-    };
+    // 3. Merge definition info into references
+    let definitionFound = false;
+    const results = references.map((ref) => {
+      if (ref.id === definition.id) {
+        definitionFound = true;
+        return {
+          ...ref,
+          kind: definition.kind,
+          preview: definition.preview,
+          role: 'definition' as const,
+        };
+      }
+      return {
+        ...ref,
+        role: 'reference' as const,
+      };
+    });
+
+    // If definition was not found in references (should not happen with includeDeclaration: true),
+    // we prepend it.
+    if (!definitionFound) {
+      results.unshift({
+        ...definition,
+        role: 'definition',
+      });
+    }
+
+    return results;
   }
 
   private parseId(id: string): { filePath: string; line: number; character: number } {

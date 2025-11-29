@@ -1,5 +1,5 @@
-import * as path from 'path';
 import Table from 'cli-table3';
+import * as path from 'path';
 import { CodeContext, LocationRef, SymbolInfo } from '../../domain/entities';
 
 export class CliPresenter {
@@ -27,9 +27,7 @@ export class CliPresenter {
         console.table(data);
       }
     } else if (typeof data === 'object' && data !== null) {
-      if ('definition' in data && 'references' in data) {
-        this.renderFindResult(data as { definition: LocationRef; references: LocationRef[] });
-      } else if ('code' in data) {
+      if ('code' in data) {
         this.renderInspectResult(data as CodeContext);
       } else {
         console.table([data]);
@@ -84,47 +82,33 @@ export class CliPresenter {
   }
 
   private renderLocationTable(locations: LocationRef[]): void {
+    const hasRole = locations.some((l) => l.role);
+    const head = ['File', 'Line', 'Kind', 'Preview', 'ID'];
+    if (hasRole) {
+      head.unshift('Role');
+    }
+
     const table = new Table({
-      head: ['File', 'Line', 'Kind', 'Preview', 'ID'],
+      head,
       style: { head: ['cyan'] },
       wordWrap: true,
     });
 
     locations.forEach((loc) => {
-      table.push([
+      const row = [
         this.toRelativePath(loc.filePath),
         loc.line,
         loc.kind,
         loc.preview?.trim().substring(0, 50) || '',
         loc.id,
-      ]);
+      ];
+      if (hasRole) {
+        row.unshift(loc.role || '');
+      }
+      table.push(row);
     });
 
     console.log(table.toString());
-  }
-
-  private renderFindResult(result: { definition: LocationRef; references: LocationRef[] }): void {
-    console.log('\nDefinition:');
-    const defTable = new Table({
-      head: ['File', 'Line', 'Kind', 'Preview', 'ID'],
-      style: { head: ['cyan'] },
-    });
-    const def = result.definition;
-    defTable.push([
-      this.toRelativePath(def.filePath),
-      def.line,
-      def.kind,
-      def.preview?.trim().substring(0, 50) || '',
-      def.id,
-    ]);
-    console.log(defTable.toString());
-
-    console.log('\nReferences:');
-    if (result.references.length > 0) {
-      this.renderLocationTable(result.references);
-    } else {
-      console.log('No references found.');
-    }
   }
 
   private renderInspectResult(result: CodeContext): void {

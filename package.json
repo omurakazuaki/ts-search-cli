@@ -1,7 +1,7 @@
 {
-  "name": "code-semantic-search",
+  "name": "ts-search-cli",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "bin": {
     "ts-search": "./dist/cli.js"
   },

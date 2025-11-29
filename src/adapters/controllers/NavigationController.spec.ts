@@ -118,17 +118,17 @@ describe('NavigationController', () => {
       const req = { query: { id: 'id1' } } as FastifyRequest<{
         Querystring: { id: string };
       }>;
-      const result = {
-        definition: {
+      const result = [
+        {
           id: 'id1',
           filePath: 'f',
           line: 1,
           character: 1,
           kind: 'k',
           preview: 'p',
+          role: 'definition' as const,
         },
-        references: [],
-      };
+      ];
       mockFindSymbolUC.execute.mockResolvedValue(result);
 
       await controller.find(req, mockReply);
