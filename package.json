@@ -1,0 +1,17 @@
+{
+  "name": "code-semantic-search",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "ts-node poc.ts"
+  },
+  "dependencies": {
+    "typescript": "^5.0.0",
+    "typescript-language-server": "^4.0.0",
+    "vscode-jsonrpc": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0"
+  }
+}
