@@ -4,6 +4,7 @@ import { FindSymbolUseCase } from '../../usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from '../../usecases/InspectCodeUseCase';
 import { MapFileUseCase } from '../../usecases/MapFileUseCase';
 import { SearchSymbolUseCase } from '../../usecases/SearchSymbolUseCase';
+import { compareIds, sortById, sortSymbolInfo } from '../../utils/sorter';
 
 export class NavigationController {
   constructor(
@@ -17,7 +18,7 @@ export class NavigationController {
     const { path } = req.query;
     try {
       const symbols = await this.mapFileUC.execute(path);
-      return reply.send({ symbols });
+      return reply.send({ symbols: sortSymbolInfo(symbols) });
     } catch (error) {
       return this.handleError(error, reply);
     }
@@ -27,7 +28,7 @@ export class NavigationController {
     const { query } = req.query;
     try {
       const candidates = await this.searchSymbolUC.execute(query);
-      return reply.send({ candidates });
+      return reply.send({ candidates: sortById(candidates) });
     } catch (error) {
       return this.handleError(error, reply);
     }
@@ -37,7 +38,7 @@ export class NavigationController {
     const { id } = req.query;
     try {
       const result = await this.findSymbolUC.execute(id);
-      return reply.send(result);
+      return reply.send(sortById(result));
     } catch (error) {
       return this.handleError(error, reply);
     }
@@ -50,6 +51,9 @@ export class NavigationController {
     const { id, expand } = req.query;
     try {
       const result = await this.inspectCodeUC.execute(id, expand);
+      if (result.relatedSymbols) {
+        result.relatedSymbols.sort(compareIds);
+      }
       return reply.send({ result });
     } catch (error) {
       return this.handleError(error, reply);
