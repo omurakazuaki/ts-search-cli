@@ -21,3 +21,9 @@ export class AmbiguousSymbolError extends DomainError {
     super(`Multiple symbols found for: ${query}`);
   }
 }
+
+export class InvalidIdError extends DomainError {
+  constructor(public readonly id: string) {
+    super(`Invalid ID format: ${id}`);
+  }
+}

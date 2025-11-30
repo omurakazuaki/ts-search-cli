@@ -1,10 +1,11 @@
 import { LocationRef, SymbolInfo } from '../domain/entities';
+import { InvalidIdError } from '../domain/errors';
 import { ILspRepository } from './ports/ILspRepository';
 
 export type FindSymbolResult = LocationRef[];
 
 export class FindSymbolUseCase {
-  constructor(private readonly lspRepo: ILspRepository) {}
+  constructor(private readonly lspRepo: ILspRepository) { }
 
   async execute(id: string): Promise<FindSymbolResult> {
     const { filePath, line, character } = this.parseId(id);
@@ -85,7 +86,7 @@ export class FindSymbolUseCase {
   private parseId(id: string): { filePath: string; line: number; character: number } {
     const parts = id.split(':');
     if (parts.length !== 3) {
-      throw new Error(`Invalid ID format: ${id}`);
+      throw new InvalidIdError(id);
     }
     return {
       filePath: parts[0],

@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { AmbiguousSymbolError, SymbolNotFoundError } from '../../domain/errors';
+import { AmbiguousSymbolError, InvalidIdError, SymbolNotFoundError } from '../../domain/errors';
 import { FindSymbolUseCase } from '../../usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from '../../usecases/InspectCodeUseCase';
 import { MapFileUseCase } from '../../usecases/MapFileUseCase';
@@ -11,14 +11,10 @@ export class NavigationController {
     private readonly findSymbolUC: FindSymbolUseCase,
     private readonly inspectCodeUC: InspectCodeUseCase,
     private readonly searchSymbolUC: SearchSymbolUseCase,
-  ) {}
+  ) { }
 
   async mapFile(req: FastifyRequest<{ Querystring: { path: string } }>, reply: FastifyReply) {
     const { path } = req.query;
-    if (!path) {
-      return reply.status(400).send({ error: 'Missing path parameter' });
-    }
-
     try {
       const symbols = await this.mapFileUC.execute(path);
       return reply.send({ symbols });
@@ -29,10 +25,6 @@ export class NavigationController {
 
   async search(req: FastifyRequest<{ Querystring: { query: string } }>, reply: FastifyReply) {
     const { query } = req.query;
-    if (!query) {
-      return reply.status(400).send({ error: 'Missing query parameter' });
-    }
-
     try {
       const candidates = await this.searchSymbolUC.execute(query);
       return reply.send({ candidates });
@@ -43,10 +35,6 @@ export class NavigationController {
 
   async find(req: FastifyRequest<{ Querystring: { id: string } }>, reply: FastifyReply) {
     const { id } = req.query;
-    if (!id) {
-      return reply.status(400).send({ error: 'Missing id parameter' });
-    }
-
     try {
       const result = await this.findSymbolUC.execute(id);
       return reply.send(result);
@@ -60,10 +48,6 @@ export class NavigationController {
     reply: FastifyReply,
   ) {
     const { id, expand } = req.query;
-    if (!id) {
-      return reply.status(400).send({ error: 'Missing id parameter' });
-    }
-
     try {
       const result = await this.inspectCodeUC.execute(id, expand);
       return reply.send({ result });
@@ -79,6 +63,11 @@ export class NavigationController {
     }
     if (error instanceof AmbiguousSymbolError) {
       return reply.status(300).send({ error: error.message, candidates: error.candidates });
+    }
+    // InvalidIdError is handled by Fastify schema validation, but we can keep it for extra safety
+    // if the use case throws it directly.
+    if (error instanceof InvalidIdError) {
+      return reply.status(400).send({ error: error.message });
     }
     return reply.status(500).send({ error: 'Internal Server Error' });
   }

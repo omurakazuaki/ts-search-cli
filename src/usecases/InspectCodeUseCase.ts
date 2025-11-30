@@ -1,4 +1,5 @@
 import { CodeContext } from '../domain/entities';
+import { InvalidIdError } from '../domain/errors';
 import { IFileRepository } from './ports/IFileRepository';
 import { ILspRepository } from './ports/ILspRepository';
 
@@ -6,7 +7,7 @@ export class InspectCodeUseCase {
   constructor(
     private readonly lspRepo: ILspRepository,
     private readonly fileRepo: IFileRepository,
-  ) {}
+  ) { }
 
   async execute(targetId: string, expand: 'block' | 'surround' = 'surround'): Promise<CodeContext> {
     const { filePath, line } = this.parseId(targetId);
@@ -68,7 +69,7 @@ export class InspectCodeUseCase {
   private parseId(id: string): { filePath: string; line: number; character: number } {
     const parts = id.split(':');
     if (parts.length < 3) {
-      throw new Error(`Invalid ID format: ${id}`);
+      throw new InvalidIdError(id);
     }
     const character = parseInt(parts.pop()!, 10);
     const line = parseInt(parts.pop()!, 10);
