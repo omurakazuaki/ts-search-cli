@@ -28,7 +28,7 @@ The tool exposes a CLI named `ts-search`.
 Lists all symbols (classes, functions, variables) in a specific file.
 
 ```bash
-npx ts-search map src/domain/entities.ts
+npx ts-search map src/domain/entities.ts | jq 'map(select(.kind == "Interface"))'
 ```
 
 ### 2. Search Symbols
@@ -45,7 +45,7 @@ Finds where a symbol is defined and all places where it is referenced using a sp
 The ID is obtained from `map` or `search` commands.
 
 ```bash
-npx ts-search find "src/domain/entities.ts::1::1"
+npx ts-search find "src/domain/entities.ts:1:18"
 ```
 
 ### 4. Inspect Code
@@ -54,7 +54,7 @@ Reads the code surrounding a specific symbol or location ID.
 
 ```bash
 # Inspect by ID (returned from map, search, or find)
-npx ts-search inspect "src/domain/entities.ts::10::1"
+npx ts-search inspect "src/domain/entities.ts:1:18"
 
 # Options
 npx ts-search inspect <id> --expand block    # (Default) Read the containing block

@@ -23,9 +23,9 @@ graph TD
     end
 
     subgraph "Layer 3: Interface Adapters (Conversion)"
-        SearchController[Search Controller]
-        LspGateway[LSP Gateway / Repository Impl]
-        FsGateway[File System Gateway]
+        NavigationController[Navigation Controller]
+        LspRepository[LspRepository]
+        FsRepository[FsRepository]
     end
 
     subgraph "Layer 2: Use Cases (Application Logic)"
@@ -34,6 +34,7 @@ graph TD
         FindSymbolUC[FindSymbol UseCase]
         InspectCodeUC[InspectCode UseCase]
         ILspPort[<Interface> ILspRepository]
+        IFilePort[<Interface> IFileRepository]
     end
 
     subgraph "Layer 1: Domain (Enterprise Logic)"
@@ -44,18 +45,36 @@ graph TD
     end
 
     %% Dependencies (Must point inwards)
-    HttpServer --> SearchController
-    SearchController --> MapFileUC
-    SearchController --> SearchSymbolUC
-    SearchController --> FindSymbolUC
+    HttpServer --> NavigationController
+    NavigationController --> MapFileUC
+    NavigationController --> SearchSymbolUC
+    NavigationController --> FindSymbolUC
+    NavigationController --> InspectCodeUC
 
     MapFileUC --> ILspPort
     SearchSymbolUC --> ILspPort
     FindSymbolUC --> ILspPort
+    InspectCodeUC --> ILspPort
+    InspectCodeUC --> IFilePort
+
+    %% Domain Dependencies
+    MapFileUC --> SymbolInfo
+    SearchSymbolUC --> SymbolInfo
+    FindSymbolUC --> LocationRef
+    InspectCodeUC --> CodeContext
+
+    ILspPort --> SymbolInfo
+    ILspPort --> LocationRef
+    IFilePort --> CodeContext
 
     %% DIP: Gateway implements Port defined in UseCase layer
-    LspGateway -- implements --> ILspPort
-    LspGateway --> LspProcess
+    LspRepository -- implements --> ILspPort
+    LspRepository --> LspProcess
+    LspRepository --> SymbolInfo
+    LspRepository --> LocationRef
+
+    FsRepository -- implements --> IFilePort
+    FsRepository --> FsImpl
 ```
 
 ## 2. Layer Definitions & Responsibilities
@@ -130,9 +149,11 @@ src/
 │
 ├── usecases/               # Layer 2: Business Rules
 │   ├── ports/              # Repository Interfaces
-│   │   └── ILspRepository.ts
+│   │   ├── ILspRepository.ts
+│   │   └── IFileRepository.ts
 │   ├── MapFileUseCase.ts
 │   ├── FindSymbolUseCase.ts
+│   ├── SearchSymbolUseCase.ts
 │   └── InspectCodeUseCase.ts
 │
 ├── adapters/               # Layer 3: Adapters
@@ -140,6 +161,7 @@ src/
 │   │   └── NavigationController.ts
 │   ├── gateways/
 │   │   ├── LspRepository.ts # Implements ILspRepository
+│   │   ├── FsRepository.ts  # Implements IFileRepository
 │   │   └── converters.ts    # LSP types <-> Domain types
 │   └── presenters/          # (Optional) Response formatting
 │
@@ -174,20 +196,27 @@ src/
 async function bootstrap() {
   // 1. Infrastructure (Drivers)
   const lspProcess = new LspProcessManager();
-  await lspProcess.start(); // サーバー起動待機
+  // await lspProcess.start(); // (Optional: handled in LspRepository.initialize)
 
   // 2. Adapters (Interface Adapters)
-  // GatewayにProcessManagerを注入
   const lspRepo = new LspRepository(lspProcess);
+  const fsRepo = new FsRepository();
+
+  await lspRepo.initialize();
 
   // 3. UseCases (Application Business Rules)
-  // UseCaseにRepository(Interface)の実装を注入
   const mapFileUC = new MapFileUseCase(lspRepo);
   const findSymbolUC = new FindSymbolUseCase(lspRepo);
+  const inspectCodeUC = new InspectCodeUseCase(lspRepo, fsRepo);
+  const searchSymbolUC = new SearchSymbolUseCase(lspRepo);
 
   // 4. Controllers
-  // ControllerにUseCaseを注入
-  const controller = new NavigationController(mapFileUC, findSymbolUC);
+  const controller = new NavigationController(
+    mapFileUC,
+    findSymbolUC,
+    inspectCodeUC,
+    searchSymbolUC
+  );
 
   // 5. Server
   const server = createServer(controller);
