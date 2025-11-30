@@ -1,5 +1,6 @@
 import { CodeContext } from '../domain/entities';
 import { InvalidIdError } from '../domain/errors';
+import { SymbolId } from '../domain/SymbolId';
 import { IFileRepository } from './ports/IFileRepository';
 import { ILspRepository } from './ports/ILspRepository';
 
@@ -10,7 +11,17 @@ export class InspectCodeUseCase {
   ) {}
 
   async execute(targetId: string, expand: 'block' | 'surround' = 'surround'): Promise<CodeContext> {
-    const { filePath, line } = this.parseId(targetId);
+    let filePath: string;
+    let line: number;
+
+    try {
+      const symbolId = SymbolId.parse(targetId);
+      filePath = symbolId.filePath;
+      line = symbolId.line;
+    } catch {
+      throw new InvalidIdError(targetId);
+    }
+
     const fileContent = await this.fileRepo.readFile(filePath);
     const lines = fileContent.split('\n');
 
@@ -64,17 +75,5 @@ export class InspectCodeUseCase {
       code,
       relatedSymbols: [], // TODO: Implement related symbols extraction if needed
     };
-  }
-
-  private parseId(id: string): { filePath: string; line: number; character: number } {
-    const parts = id.split(':');
-    if (parts.length < 3) {
-      throw new InvalidIdError(id);
-    }
-    const character = parseInt(parts.pop()!, 10);
-    const line = parseInt(parts.pop()!, 10);
-    const filePath = parts.join(':'); // Rejoin the rest as file path
-
-    return { filePath, line, character };
   }
 }

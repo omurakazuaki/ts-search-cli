@@ -1,5 +1,6 @@
 import { LocationRef, SymbolInfo } from '../domain/entities';
 import { InvalidIdError } from '../domain/errors';
+import { SymbolId } from '../domain/SymbolId';
 import { ILspRepository } from './ports/ILspRepository';
 
 export type FindSymbolResult = LocationRef[];
@@ -8,7 +9,18 @@ export class FindSymbolUseCase {
   constructor(private readonly lspRepo: ILspRepository) {}
 
   async execute(id: string): Promise<FindSymbolResult> {
-    const { filePath, line, character } = this.parseId(id);
+    let filePath: string;
+    let line: number;
+    let character: number;
+
+    try {
+      const symbolId = SymbolId.parse(id);
+      filePath = symbolId.filePath;
+      line = symbolId.line;
+      character = symbolId.character;
+    } catch {
+      throw new InvalidIdError(id);
+    }
 
     // 1. Get Document Symbols to find the exact symbol range
     // This is important because the ID might point to a slightly different location
@@ -81,18 +93,6 @@ export class FindSymbolUseCase {
     }
 
     return results;
-  }
-
-  private parseId(id: string): { filePath: string; line: number; character: number } {
-    const parts = id.split(':');
-    if (parts.length !== 3) {
-      throw new InvalidIdError(id);
-    }
-    return {
-      filePath: parts[0],
-      line: parseInt(parts[1], 10),
-      character: parseInt(parts[2], 10),
-    };
   }
 
   private findSymbolContainingPoint(

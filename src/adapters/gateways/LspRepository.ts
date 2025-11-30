@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as rpc from 'vscode-jsonrpc/node';
 import * as lsp from 'vscode-languageserver-protocol';
 import { LocationRef, SymbolInfo } from '../../domain/entities';
+import { SymbolId } from '../../domain/SymbolId';
 import { ProjectFileScanner } from '../../infrastructure/file/ProjectFileScanner';
 import { LspProcessManager } from '../../infrastructure/lsp/LspProcessManager';
 import { ILspRepository } from '../../usecases/ports/ILspRepository';
@@ -269,7 +270,11 @@ export class LspRepository implements ILspRepository {
     );
     // Create ID based on selectionRange (the identifier)
     const relativePath = path.relative(process.cwd(), filePath);
-    const id = `${relativePath}:${symbol.selectionRange.start.line + 1}:${symbol.selectionRange.start.character + 1}`;
+    const id = new SymbolId(
+      relativePath,
+      symbol.selectionRange.start.line + 1,
+      symbol.selectionRange.start.character + 1,
+    ).toString();
 
     return {
       id,
@@ -331,7 +336,7 @@ export class LspRepository implements ILspRepository {
     const relativePath = path.relative(process.cwd(), filePath);
     const line = location.range.start.line + 1;
     const character = location.range.start.character + 1;
-    return `${relativePath}:${line}:${character}`;
+    return new SymbolId(relativePath, line, character).toString();
   }
 
   private uriToPath(uri: string): string {
