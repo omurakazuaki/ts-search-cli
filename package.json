@@ -1,6 +1,6 @@
 {
   "name": "@kazomur/ts-search-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": false,
   "bin": {
     "ts-search": "./dist/cli.js"
@@ -23,6 +23,7 @@
     "glob": "^13.0.0",
     "ignore": "^7.0.5",
     "portfinder": "^1.0.38",
+    "typescript": "^5.9.3",
     "typescript-language-server": "^4.0.0",
     "vscode-jsonrpc": "^8.2.0",
     "vscode-languageserver-protocol": "^3.17.5",
