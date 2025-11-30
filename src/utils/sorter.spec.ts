@@ -15,7 +15,7 @@ describe('sorter', () => {
       // Invalid format vs Valid format
       expect(compareIds('invalid', 'a.ts:10:5')).toBeGreaterThan(0); // 'i' > 'a'
       expect(compareIds('a.ts:10:5', 'invalid')).toBeLessThan(0); // 'a' < 'i'
-      
+
       // Two invalid IDs
       expect(compareIds('abc', 'def')).toBeLessThan(0);
     });
@@ -61,7 +61,7 @@ describe('sorter', () => {
 
       expect(sorted[0].name).toBe('A');
       expect(sorted[1].name).toBe('B');
-      
+
       // Check children sorting
       expect(sorted[1].children![0].name).toBe('B1');
       expect(sorted[1].children![1].name).toBe('B2');
