@@ -7,7 +7,7 @@ export class InspectCodeUseCase {
   constructor(
     private readonly lspRepo: ILspRepository,
     private readonly fileRepo: IFileRepository,
-  ) { }
+  ) {}
 
   async execute(targetId: string, expand: 'block' | 'surround' = 'surround'): Promise<CodeContext> {
     const { filePath, line } = this.parseId(targetId);

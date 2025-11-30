@@ -33,7 +33,7 @@ describe('NavigationController', () => {
     } as unknown as jest.Mocked<FastifyReply>;
 
     // Silence console.error during tests
-    jest.spyOn(console, 'error').mockImplementation(() => { });
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {

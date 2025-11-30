@@ -5,7 +5,7 @@ import { ILspRepository } from './ports/ILspRepository';
 export type FindSymbolResult = LocationRef[];
 
 export class FindSymbolUseCase {
-  constructor(private readonly lspRepo: ILspRepository) { }
+  constructor(private readonly lspRepo: ILspRepository) {}
 
   async execute(id: string): Promise<FindSymbolResult> {
     const { filePath, line, character } = this.parseId(id);

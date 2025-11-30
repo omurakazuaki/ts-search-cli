@@ -89,7 +89,8 @@ async function ensureServerRunning(): Promise<number> {
 
   child.unref();
 
-  const port = await waitForServer();
+  // Wait up to 5 minutes for the server to start (large repos take time to index)
+  const port = await waitForServer(300);
   console.error(`Server started on port ${port}.`);
   return port;
 }
@@ -188,6 +189,6 @@ cli.command('stop', 'Stop the background server').action(async () => {
 });
 
 cli.help();
-cli.version('0.1.0');
+cli.version('0.1.1');
 
 cli.parse();

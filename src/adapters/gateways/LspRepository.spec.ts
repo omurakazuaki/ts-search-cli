@@ -54,7 +54,7 @@ describe('LspRepository', () => {
   describe('initialize', () => {
     beforeEach(() => {
       jest.useFakeTimers();
-      jest.spyOn(console, 'warn').mockImplementation(() => { });
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
     afterEach(() => {

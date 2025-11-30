@@ -114,7 +114,7 @@ export class LspRepository implements ILspRepository {
           timeoutId = setTimeout(() => {
             console.log('Project indexing timed out.');
             resolve();
-          }, 30000);
+          }, 300000);
         });
 
         // Wrap loadingPromise to clear timeout on completion

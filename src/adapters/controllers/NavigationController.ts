@@ -11,7 +11,7 @@ export class NavigationController {
     private readonly findSymbolUC: FindSymbolUseCase,
     private readonly inspectCodeUC: InspectCodeUseCase,
     private readonly searchSymbolUC: SearchSymbolUseCase,
-  ) { }
+  ) {}
 
   async mapFile(req: FastifyRequest<{ Querystring: { path: string } }>, reply: FastifyReply) {
     const { path } = req.query;

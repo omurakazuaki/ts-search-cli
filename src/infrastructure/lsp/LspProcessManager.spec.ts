@@ -79,7 +79,7 @@ describe('LspProcessManager', () => {
   });
 
   it('should handle stderr data', () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     manager.start();
     mockChildProcess.stderr.emit('data', 'some error');
     expect(consoleSpy).toHaveBeenCalledWith('[LSP Stderr] some error');

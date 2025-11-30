@@ -4,54 +4,70 @@ import { NavigationController } from '../../adapters/controllers/NavigationContr
 export function createServer(controller: NavigationController): FastifyInstance {
   const server = fastify();
 
-  server.get('/map', {
-    schema: {
-      querystring: {
-        type: 'object',
-        properties: {
-          path: { type: 'string', minLength: 1 }
+  server.get(
+    '/map',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            path: { type: 'string', minLength: 1 },
+          },
+          required: ['path'],
         },
-        required: ['path']
-      }
-    }
-  }, controller.mapFile.bind(controller));
+      },
+    },
+    controller.mapFile.bind(controller),
+  );
 
-  server.get('/search', {
-    schema: {
-      querystring: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', minLength: 1 }
+  server.get(
+    '/search',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', minLength: 1 },
+          },
+          required: ['query'],
         },
-        required: ['query']
-      }
-    }
-  }, controller.search.bind(controller));
+      },
+    },
+    controller.search.bind(controller),
+  );
 
-  server.get('/find', {
-    schema: {
-      querystring: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', pattern: '^.+:\\d+:\\d+$' }
+  server.get(
+    '/find',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', pattern: '^.+:\\d+:\\d+$' },
+          },
+          required: ['id'],
         },
-        required: ['id']
-      }
-    }
-  }, controller.find.bind(controller));
+      },
+    },
+    controller.find.bind(controller),
+  );
 
-  server.get('/inspect', {
-    schema: {
-      querystring: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', pattern: '^.+:\\d+:\\d+$' },
-          expand: { type: 'string', enum: ['block', 'surround', 'file', 'none'] }
+  server.get(
+    '/inspect',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', pattern: '^.+:\\d+:\\d+$' },
+            expand: { type: 'string', enum: ['block', 'surround', 'file', 'none'] },
+          },
+          required: ['id'],
         },
-        required: ['id']
-      }
-    }
-  }, controller.inspect.bind(controller));
+      },
+    },
+    controller.inspect.bind(controller),
+  );
   server.get('/health', async () => ({ status: 'ok' }));
   server.post('/shutdown', async () => {
     setTimeout(() => process.kill(process.pid, 'SIGTERM'), 200);
