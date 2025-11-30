@@ -54,10 +54,12 @@ describe('LspRepository', () => {
   describe('initialize', () => {
     beforeEach(() => {
       jest.useFakeTimers();
+      jest.spyOn(console, 'warn').mockImplementation(() => { });
     });
 
     afterEach(() => {
       jest.useRealTimers();
+      jest.restoreAllMocks();
     });
 
     it('should start process and initialize connection', async () => {

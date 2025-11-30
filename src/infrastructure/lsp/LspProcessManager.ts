@@ -4,7 +4,7 @@ import { Readable, Writable } from 'stream';
 export class LspProcessManager {
   private process: cp.ChildProcess | null = null;
 
-  constructor(private readonly serverName: string = 'typescript-language-server') {}
+  constructor(private readonly serverName: string = 'typescript-language-server') { }
 
   start(): void {
     if (this.process) {
@@ -16,7 +16,6 @@ export class LspProcessManager {
     this.process = cp.spawn('node', [serverPath, '--stdio']);
 
     this.process.on('exit', (code) => {
-      console.log(`LSP Server exited with code ${code}`);
       this.process = null;
     });
 

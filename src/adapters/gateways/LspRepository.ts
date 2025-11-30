@@ -109,8 +109,20 @@ export class LspRepository implements ILspRepository {
 
       if (hasStarted) {
         console.log('Waiting for project indexing to complete...');
-        const timeout = new Promise((resolve) => setTimeout(resolve, 30000));
-        await Promise.race([loadingPromise, timeout]);
+        let timeoutId: NodeJS.Timeout;
+        const timeout = new Promise<void>((resolve) => {
+          timeoutId = setTimeout(() => {
+            console.log('Project indexing timed out.');
+            resolve();
+          }, 30000);
+        });
+
+        // Wrap loadingPromise to clear timeout on completion
+        const loading = loadingPromise.then(() => {
+          clearTimeout(timeoutId);
+        });
+
+        await Promise.race([loading, timeout]);
         console.log('Project indexing completed or timed out.');
       } else {
         await new Promise((resolve) => setTimeout(resolve, 1000));

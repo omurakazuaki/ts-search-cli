@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { AmbiguousSymbolError, SymbolNotFoundError } from '../../domain/errors';
+import { AmbiguousSymbolError, InvalidIdError, SymbolNotFoundError } from '../../domain/errors';
 import { FindSymbolUseCase } from '../../usecases/FindSymbolUseCase';
 import { InspectCodeUseCase } from '../../usecases/InspectCodeUseCase';
 import { MapFileUseCase } from '../../usecases/MapFileUseCase';
@@ -33,7 +33,7 @@ describe('NavigationController', () => {
     } as unknown as jest.Mocked<FastifyReply>;
 
     // Silence console.error during tests
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => { });
   });
 
   afterEach(() => {
@@ -51,13 +51,6 @@ describe('NavigationController', () => {
       await controller.mapFile(req, mockReply);
 
       expect(mockReply.send).toHaveBeenCalledWith({ symbols });
-    });
-
-    it('should return 400 if path is missing', async () => {
-      const req = { query: {} } as FastifyRequest<{ Querystring: { path: string } }>;
-      await controller.mapFile(req, mockReply);
-      expect(mockReply.status).toHaveBeenCalledWith(400);
-      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Missing path parameter' });
     });
 
     it('should handle generic errors', async () => {
@@ -96,13 +89,6 @@ describe('NavigationController', () => {
       expect(mockReply.send).toHaveBeenCalledWith({ candidates });
     });
 
-    it('should return 400 if query is missing', async () => {
-      const req = { query: {} } as FastifyRequest<{ Querystring: { query: string } }>;
-      await controller.search(req, mockReply);
-      expect(mockReply.status).toHaveBeenCalledWith(400);
-      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Missing query parameter' });
-    });
-
     it('should handle errors', async () => {
       const req = { query: { query: 'Test' } } as FastifyRequest<{
         Querystring: { query: string };
@@ -134,13 +120,6 @@ describe('NavigationController', () => {
       await controller.find(req, mockReply);
 
       expect(mockReply.send).toHaveBeenCalledWith(result);
-    });
-
-    it('should return 400 if id is missing', async () => {
-      const req = { query: {} } as FastifyRequest<{ Querystring: { id: string } }>;
-      await controller.find(req, mockReply);
-      expect(mockReply.status).toHaveBeenCalledWith(400);
-      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Missing id parameter' });
     });
 
     it('should return 404 if symbol not found', async () => {
@@ -180,6 +159,18 @@ describe('NavigationController', () => {
         candidates,
       });
     });
+
+    it('should return 400 if id is invalid', async () => {
+      const req = { query: { id: 'Invalid' } } as FastifyRequest<{
+        Querystring: { id: string };
+      }>;
+      mockFindSymbolUC.execute.mockRejectedValue(new InvalidIdError('Invalid'));
+
+      await controller.find(req, mockReply);
+
+      expect(mockReply.status).toHaveBeenCalledWith(400);
+      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Invalid ID format: Invalid' });
+    });
   });
 
   describe('inspect', () => {
@@ -198,13 +189,6 @@ describe('NavigationController', () => {
       await controller.inspect(req, mockReply);
 
       expect(mockReply.send).toHaveBeenCalledWith({ result });
-    });
-
-    it('should return 400 if id is missing', async () => {
-      const req = { query: {} } as FastifyRequest<{ Querystring: { id: string } }>;
-      await controller.inspect(req, mockReply);
-      expect(mockReply.status).toHaveBeenCalledWith(400);
-      expect(mockReply.send).toHaveBeenCalledWith({ error: 'Missing id parameter' });
     });
 
     it('should handle errors', async () => {

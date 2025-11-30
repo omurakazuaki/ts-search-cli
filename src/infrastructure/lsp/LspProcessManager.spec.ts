@@ -54,16 +54,11 @@ describe('LspProcessManager', () => {
   });
 
   it('should handle process exit', () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-
     manager.start();
     mockChildProcess.emit('exit', 0);
 
-    expect(consoleSpy).toHaveBeenCalledWith('LSP Server exited with code 0');
     // Check if process is null by trying to access stdout, should throw
     expect(() => manager.stdout).toThrow('Process not started');
-
-    consoleSpy.mockRestore();
   });
 
   it('should throw if accessing stdout/stdin before start', () => {
@@ -84,7 +79,7 @@ describe('LspProcessManager', () => {
   });
 
   it('should handle stderr data', () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
     manager.start();
     mockChildProcess.stderr.emit('data', 'some error');
     expect(consoleSpy).toHaveBeenCalledWith('[LSP Stderr] some error');
