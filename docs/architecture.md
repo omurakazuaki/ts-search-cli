@@ -137,9 +137,48 @@ graph TD
 - **Process Manager:** typescript-language-server の起動、再起動、停止、標準入出力のパイプ管理。
 - **Main:** アプリケーションの組立工場（Composition Root）。
 
-## 3. Implementation Details
+## 3. Sequence Diagram
 
-### 3.1. Directory Structure
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant Server
+    participant NavigationController
+    participant SearchSymbolUseCase
+    participant LspRepository
+    participant LSPServer
+
+    User->>CLI: ts-search search "query"
+    CLI->>Server: GET /search?query="query"
+    Server->>NavigationController: search(req, reply)
+    NavigationController->>SearchSymbolUseCase: execute("query")
+
+    loop Retry Logic (if candidates empty)
+        SearchSymbolUseCase->>LspRepository: getWorkspaceSymbols("query")
+        LspRepository->>LspRepository: ensureConnected()
+
+        note right of LspRepository: Uses vscode-jsonrpc over process stdin/stdout
+        LspRepository->>LSPServer: JSON-RPC Request: workspace/symbol
+        LSPServer-->>LspRepository: JSON-RPC Response: SymbolInformation[]
+
+        LspRepository->>LspRepository: mapSymbolInformation()
+        LspRepository-->>SearchSymbolUseCase: LocationRef[]
+
+        opt Wait and Retry
+            SearchSymbolUseCase->>SearchSymbolUseCase: wait(1000ms)
+        end
+    end
+
+    SearchSymbolUseCase-->>NavigationController: candidates
+    NavigationController-->>Server: JSON response
+    Server-->>CLI: JSON response
+    CLI-->>User: Display results
+```
+
+## 4. Implementation Details
+
+### 4.1. Directory Structure
 
 ```
 src/
@@ -173,7 +212,7 @@ src/
 └── main.ts                 # Entry point (Composition Root)
 ```
 
-### 3.2. Error Handling Strategy
+### 4.2. Error Handling Strategy
 
 例外は境界（Boundary）を越えるたびに翻訳されなければならない。
 
@@ -187,7 +226,7 @@ src/
 - `AmbiguousSymbolError` -> 300 Multiple Choices
 - その他 -> 500 Internal Server Error
 
-### 3.3. Dependency Injection (Manual Wiring)
+### 4.3. Dependency Injection (Manual Wiring)
 
 複雑な DI コンテナは避け、`main.ts` で明示的に依存関係を注入する。これにより構成が一目でわかる。
 
@@ -224,7 +263,7 @@ async function bootstrap() {
 }
 ```
 
-## 4. Testing Strategy
+## 5. Testing Strategy
 
 このアーキテクチャにより、テスト容易性が最大化される。
 
@@ -239,7 +278,7 @@ async function bootstrap() {
 - **E2E Tests:**
   - 実際に HTTP リクエストを投げ、レスポンスを確認するスモークテスト。
 
-## 5. Development Phases
+## 6. Development Phases
 
 - **Phase 1: Domain & Ports Definition**
   - 型定義のみを行う。システムの「言葉」を定義する。
