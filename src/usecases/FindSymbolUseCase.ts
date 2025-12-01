@@ -22,30 +22,49 @@ export class FindSymbolUseCase {
       throw new InvalidIdError(id);
     }
 
+    // 0. Try to resolve the actual definition location
+    let targetFilePath = filePath;
+    let targetLine = line;
+    let targetChar = character;
+    let definitionId = id;
+
+    try {
+      const definitions = await this.lspRepo.getDefinition(filePath, line, character);
+      if (definitions.length > 0) {
+        const def = definitions[0];
+        targetFilePath = def.filePath;
+        targetLine = def.line;
+        targetChar = def.character;
+        definitionId = def.id;
+      }
+    } catch (e) {
+      console.warn(`Failed to get definition for ${id}:`, e);
+    }
+
     // 1. Get Document Symbols to find the exact symbol range
     // This is important because the ID might point to a slightly different location
     // or we want to ensure we have the correct selectionRange for the identifier.
     // Also, we need to construct the 'definition' object.
     let definition: LocationRef = {
-      id,
-      filePath,
-      line,
-      character,
+      id: definitionId,
+      filePath: targetFilePath,
+      line: targetLine,
+      character: targetChar,
       kind: 'Unknown',
       preview: '',
     };
 
-    let searchLine = line;
-    let searchChar = character;
+    let searchLine = targetLine;
+    let searchChar = targetChar;
 
     try {
-      const symbols = await this.lspRepo.getDocumentSymbols(filePath);
-      const match = this.findSymbolContainingPoint(symbols, line, character);
+      const symbols = await this.lspRepo.getDocumentSymbols(targetFilePath);
+      const match = this.findSymbolContainingPoint(symbols, targetLine, targetChar);
 
       if (match) {
         definition = {
           id: match.id,
-          filePath,
+          filePath: targetFilePath,
           line: match.selectionRange?.start.line || match.line,
           character: match.selectionRange?.start.character || 1,
           kind: match.kind,
@@ -59,11 +78,11 @@ export class FindSymbolUseCase {
       }
     } catch (e) {
       // Fallback to using the ID coordinates directly
-      console.warn(`Failed to get document symbols for ${filePath}:`, e);
+      console.warn(`Failed to get document symbols for ${targetFilePath}:`, e);
     }
 
     // 2. Find references
-    const references = await this.lspRepo.getReferences(filePath, searchLine, searchChar);
+    const references = await this.lspRepo.getReferences(targetFilePath, searchLine, searchChar);
 
     // 3. Merge definition info into references
     let definitionFound = false;

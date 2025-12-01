@@ -13,7 +13,7 @@ describe('FindSymbolUseCase', () => {
       getDocumentSymbols: jest.fn(),
       getWorkspaceSymbols: jest.fn(),
       getReferences: jest.fn(),
-      getDefinition: jest.fn(),
+      getDefinition: jest.fn().mockResolvedValue([]),
       getFoldingRanges: jest.fn(),
     };
     useCase = new FindSymbolUseCase(mockRepo);
@@ -113,5 +113,70 @@ describe('FindSymbolUseCase', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('nested');
     expect(result[0].role).toBe('definition');
+  });
+
+  it('should resolve definition location before finding references', async () => {
+    // Input ID points to a usage (reference)
+    const inputId = 'src/usage.ts:5:10';
+
+    // getDefinition returns the actual definition
+    mockRepo.getDefinition.mockResolvedValue([
+      {
+        id: 'src/def.ts:10:5',
+        filePath: 'src/def.ts',
+        line: 10,
+        character: 5,
+        kind: 'Class',
+        preview: 'class Test {}',
+      },
+    ]);
+
+    // getDocumentSymbols on the definition file returns the symbol info
+    mockRepo.getDocumentSymbols.mockResolvedValue([
+      {
+        id: 'src/def.ts:10:5',
+        name: 'Test',
+        kind: 'Class',
+        line: 10,
+        range: { start: { line: 10, character: 1 }, end: { line: 10, character: 20 } },
+        selectionRange: { start: { line: 10, character: 5 }, end: { line: 10, character: 9 } },
+      },
+    ]);
+
+    // getReferences returns both definition and usage
+    mockRepo.getReferences.mockResolvedValue([
+      {
+        id: 'src/def.ts:10:5',
+        filePath: 'src/def.ts',
+        line: 10,
+        character: 5,
+        kind: 'Reference',
+        preview: '',
+      },
+      {
+        id: 'src/usage.ts:5:10',
+        filePath: 'src/usage.ts',
+        line: 5,
+        character: 10,
+        kind: 'Reference',
+        preview: '',
+      },
+    ]);
+
+    const result = await useCase.execute(inputId);
+
+    expect(mockRepo.getDefinition).toHaveBeenCalledWith('src/usage.ts', 5, 10);
+    expect(mockRepo.getDocumentSymbols).toHaveBeenCalledWith('src/def.ts');
+    expect(mockRepo.getReferences).toHaveBeenCalledWith('src/def.ts', 10, 5);
+
+    const def = result.find((r) => r.role === 'definition');
+    const ref = result.find((r) => r.role === 'reference');
+
+    expect(def).toBeDefined();
+    expect(def?.id).toBe('src/def.ts:10:5');
+    expect(def?.filePath).toBe('src/def.ts');
+
+    expect(ref).toBeDefined();
+    expect(ref?.id).toBe('src/usage.ts:5:10');
   });
 });
