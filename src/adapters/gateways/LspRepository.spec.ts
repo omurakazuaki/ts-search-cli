@@ -13,8 +13,15 @@ describe('LspRepository', () => {
   let repository: LspRepository;
   let mockProcessManager: jest.Mocked<LspProcessManager>;
   let mockConnection: jest.Mocked<rpc.MessageConnection>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let notificationHandlers: Map<string, (params: any) => void>;
 
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    notificationHandlers = new Map();
     mockProcessManager = new LspProcessManager() as jest.Mocked<LspProcessManager>;
     Object.defineProperty(mockProcessManager, 'stdout', {
       get: jest.fn().mockReturnValue(new PassThrough()),
@@ -27,12 +34,33 @@ describe('LspRepository', () => {
 
     mockConnection = {
       listen: jest.fn(),
-      sendRequest: jest.fn(),
-      sendNotification: jest.fn(),
+      sendRequest: jest.fn().mockResolvedValue(undefined),
+      sendNotification: jest.fn().mockResolvedValue(undefined),
       dispose: jest.fn(),
       onRequest: jest.fn(),
       onNotification: jest.fn(),
     } as unknown as jest.Mocked<rpc.MessageConnection>;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mockConnection.onNotification as jest.Mock).mockImplementation((method: any, handler: any) => {
+      if (typeof method === 'string') {
+        notificationHandlers.set(method, handler);
+      }
+    });
+
+    mockConnection.sendNotification.mockImplementation((method, params) => {
+      if (method === 'textDocument/didOpen') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const uri = (params as any).textDocument.uri;
+        const handler = notificationHandlers.get('textDocument/publishDiagnostics');
+        if (handler) {
+          handler({ uri, diagnostics: [] });
+        } else {
+          console.log('Handler for publishDiagnostics not found!');
+        }
+      }
+      return Promise.resolve();
+    });
 
     (rpc.createMessageConnection as jest.Mock).mockReturnValue(mockConnection);
 
@@ -41,18 +69,25 @@ describe('LspRepository', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
-  describe('initialize', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-      jest.spyOn(console, 'warn').mockImplementation(() => {});
-    });
+  const fastInitialize = async () => {
+    const initPromise = repository.initialize();
 
-    afterEach(() => {
-      jest.useRealTimers();
-      jest.restoreAllMocks();
-    });
+    // Yield multiple times to allow initialize to reach the setTimeout
+    for (let i = 0; i < 20; i++) {
+      await Promise.resolve();
+    }
+
+    jest.advanceTimersByTime(10000);
+
+    await initPromise;
+  };
+
+  describe('initialize', () => {
+    // Remove local beforeEach/afterEach for timers since it's global now
 
     it('should start process and initialize connection', async () => {
       const initPromise = repository.initialize();
@@ -63,12 +98,13 @@ describe('LspRepository', () => {
         await Promise.resolve();
       }
 
-      // Fast-forward through the initial waits
-      jest.advanceTimersByTime(500);
+      // Fast-forward through the waitForStart (5000ms timeout if not started)
+      jest.advanceTimersByTime(5000);
       for (let i = 0; i < 20; i++) {
         await Promise.resolve();
       }
 
+      // Fast-forward through the buffer (1000ms)
       jest.advanceTimersByTime(1000);
       for (let i = 0; i < 20; i++) {
         await Promise.resolve();
@@ -111,19 +147,25 @@ describe('LspRepository', () => {
         });
       }
 
-      // Advance time to finish the 500ms wait
-      jest.advanceTimersByTime(500);
+      // Advance time to finish the waitForStart (it checks interval every 100ms)
+      jest.advanceTimersByTime(200);
       for (let i = 0; i < 20; i++) {
         await Promise.resolve();
       }
 
-      // Now it should be waiting for the 'end' notification or 30s timeout.
+      // Now it should be waiting for the 'end' notification or 300s timeout.
       // Trigger 'end' notification
       if (progressCallback) {
         progressCallback({
           token: '123',
           value: { kind: 'end' },
         });
+      }
+
+      // Advance time for the buffer after indexing (1000ms)
+      jest.advanceTimersByTime(1000);
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
       }
 
       // It should resolve now
@@ -135,6 +177,47 @@ describe('LspRepository', () => {
       );
     });
 
+    it('should timeout if indexing takes too long', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let progressCallback: ((params: any) => void) | undefined;
+      (mockConnection.onNotification as jest.Mock).mockImplementation((method, handler) => {
+        if (method === '$/progress') {
+          progressCallback = handler;
+        }
+      });
+
+      const initPromise = repository.initialize();
+
+      // Trigger 'begin' notification immediately while initialize is paused at first await
+      if (progressCallback) {
+        progressCallback({
+          token: '123',
+          value: { kind: 'begin', title: 'Initializing JS/TS language features' },
+        });
+      }
+
+      // Wait for initialize to reach the timeout check
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      // Advance time past the 300s timeout
+      jest.advanceTimersByTime(300000);
+
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      // Advance buffer
+      jest.advanceTimersByTime(1000);
+
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      await initPromise;
+    });
+
     it('should not open any documents during initialization', async () => {
       const initPromise = repository.initialize();
 
@@ -142,7 +225,7 @@ describe('LspRepository', () => {
         await Promise.resolve();
       }
 
-      jest.advanceTimersByTime(500);
+      jest.advanceTimersByTime(5000);
       for (let i = 0; i < 20; i++) {
         await Promise.resolve();
       }
@@ -160,7 +243,7 @@ describe('LspRepository', () => {
 
   describe('shutdown', () => {
     it('should dispose connection and stop process', async () => {
-      await repository.initialize();
+      await fastInitialize();
       await repository.shutdown();
 
       expect(mockConnection.dispose).toHaveBeenCalled();
@@ -175,7 +258,7 @@ describe('LspRepository', () => {
 
   describe('getDocumentSymbols', () => {
     it('should return symbols', async () => {
-      await repository.initialize();
+      await fastInitialize();
       (fs.readFile as jest.Mock).mockResolvedValue('content');
 
       const mockSymbols: lsp.DocumentSymbol[] = [
@@ -202,7 +285,7 @@ describe('LspRepository', () => {
     });
 
     it('should handle nested symbols', async () => {
-      await repository.initialize();
+      await fastInitialize();
       (fs.readFile as jest.Mock).mockResolvedValue('content');
 
       const mockSymbols: lsp.DocumentSymbol[] = [
@@ -243,14 +326,14 @@ describe('LspRepository', () => {
     });
 
     it('should return empty array if no result', async () => {
-      await repository.initialize();
+      await fastInitialize();
       mockConnection.sendRequest.mockResolvedValue(null);
       const result = await repository.getDocumentSymbols('src/test.ts');
       expect(result).toEqual([]);
     });
 
     it('should return empty array if result is not DocumentSymbol[]', async () => {
-      await repository.initialize();
+      await fastInitialize();
       mockConnection.sendRequest.mockResolvedValue([]); // Empty array
       const result = await repository.getDocumentSymbols('src/test.ts');
       expect(result).toEqual([]);
@@ -261,11 +344,57 @@ describe('LspRepository', () => {
         'LSP connection not initialized',
       );
     });
+
+    it('should return imports and instantiations from source file', async () => {
+      await fastInitialize();
+      const fileContent = `
+        import { Foo } from './foo';
+        import * as Bar from './bar';
+        const f = new Foo();
+        const b = new Bar.Baz();
+      `;
+      (fs.readFile as jest.Mock).mockResolvedValue(fileContent);
+
+      mockConnection.sendRequest.mockResolvedValue([]);
+
+      const result = await repository.getDocumentSymbols('src/test.ts');
+
+      expect(result.some((s) => s.name === 'Foo' && s.kind === 'Variable')).toBe(true);
+      expect(result.some((s) => s.name === 'Bar' && s.kind === 'Module')).toBe(true);
+      expect(result.some((s) => s.name === 'Foo' && s.kind === 'Class')).toBe(true);
+      expect(result.some((s) => s.name === 'Bar.Baz' && s.kind === 'Class')).toBe(true);
+    });
+
+    it('should proceed if diagnostics are not received within timeout', async () => {
+      await fastInitialize();
+      (fs.readFile as jest.Mock).mockResolvedValue('content');
+      mockConnection.sendRequest.mockResolvedValue([]);
+
+      // Override sendNotification to NOT trigger diagnostics
+      mockConnection.sendNotification.mockImplementation(() => Promise.resolve());
+
+      const promise = repository.getDocumentSymbols('src/test.ts');
+
+      // Yield to let openDocument reach setTimeout
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      // Advance past the 5000ms timeout in openDocument
+      jest.advanceTimersByTime(5000);
+
+      await promise;
+
+      expect(mockConnection.sendNotification).toHaveBeenCalledWith(
+        'textDocument/didOpen',
+        expect.any(Object),
+      );
+    });
   });
 
   describe('getWorkspaceSymbols', () => {
     it('should return symbols', async () => {
-      await repository.initialize();
+      await fastInitialize();
       const mockSymbols: lsp.SymbolInformation[] = [
         {
           name: 'Test',
@@ -288,7 +417,7 @@ describe('LspRepository', () => {
     });
 
     it('should return empty array if no result', async () => {
-      await repository.initialize();
+      await fastInitialize();
       mockConnection.sendRequest.mockResolvedValue(null);
       const result = await repository.getWorkspaceSymbols('Test');
       expect(result).toEqual([]);
@@ -297,7 +426,7 @@ describe('LspRepository', () => {
 
   describe('getReferences', () => {
     it('should return references', async () => {
-      await repository.initialize();
+      await fastInitialize();
       const mockLocations: lsp.Location[] = [
         {
           uri: 'file:///src/test.ts',
@@ -316,7 +445,7 @@ describe('LspRepository', () => {
     });
 
     it('should return empty array if no result', async () => {
-      await repository.initialize();
+      await fastInitialize();
       mockConnection.sendRequest.mockResolvedValue(null);
       const result = await repository.getReferences('src/test.ts', 1, 1);
       expect(result).toEqual([]);
@@ -325,7 +454,7 @@ describe('LspRepository', () => {
 
   describe('getDefinition', () => {
     it('should return definition', async () => {
-      await repository.initialize();
+      await fastInitialize();
       const mockLocation: lsp.Location = {
         uri: 'file:///src/test.ts',
         range: {
@@ -342,7 +471,7 @@ describe('LspRepository', () => {
     });
 
     it('should handle array of locations', async () => {
-      await repository.initialize();
+      await fastInitialize();
       const mockLocations: lsp.Location[] = [
         {
           uri: 'file:///src/test.ts',
@@ -360,7 +489,7 @@ describe('LspRepository', () => {
     });
 
     it('should return empty array if no result', async () => {
-      await repository.initialize();
+      await fastInitialize();
       mockConnection.sendRequest.mockResolvedValue(null);
       const result = await repository.getDefinition('src/test.ts', 1, 1);
       expect(result).toEqual([]);
@@ -369,7 +498,7 @@ describe('LspRepository', () => {
 
   describe('getFoldingRanges', () => {
     it('should return folding ranges', async () => {
-      await repository.initialize();
+      await fastInitialize();
       (fs.readFile as jest.Mock).mockResolvedValue('content');
       const mockRanges: lsp.FoldingRange[] = [
         {
@@ -387,7 +516,7 @@ describe('LspRepository', () => {
     });
 
     it('should return empty array if no result', async () => {
-      await repository.initialize();
+      await fastInitialize();
       mockConnection.sendRequest.mockResolvedValue(null);
       const result = await repository.getFoldingRanges('src/test.ts');
       expect(result).toEqual([]);
