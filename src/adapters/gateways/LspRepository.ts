@@ -26,6 +26,14 @@ export class LspRepository implements ILspRepository {
 
     this.connection.listen();
 
+    // Respond to standard server-to-client requests defined by the LSP. Without these
+    // handlers the server may block while waiting for configuration or dynamic
+    // registrations, which in turn can make the first user request return incomplete
+    // results.
+    this.connection.onRequest('client/registerCapability', () => null);
+    this.connection.onRequest('client/unregisterCapability', () => null);
+    this.connection.onRequest('workspace/configuration', () => []);
+
     // Handle diagnostics to track file processing
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.connection.onNotification('textDocument/publishDiagnostics', (params: any) => {
@@ -37,25 +45,39 @@ export class LspRepository implements ILspRepository {
       }
     });
 
-    // Handle progress creation request
-    this.connection.onRequest('window/workDoneProgress/create', () => null);
+    // Handle workDoneProgress/create as defined in the LSP. The server can request the
+    // client to create a progress token before sending $/progress notifications. We don't
+    // render any UI, but we must still acknowledge the request to stay compliant with the
+    // protocol and to receive the associated progress events.
+    let initializationProgressToken: string | number | null = null;
+    this.connection.onRequest('window/workDoneProgress/create', (params: { token: string | number }) => {
+      // Only track the first initialization progress token so that we can wait for the
+      // corresponding "end" notification before sending user requests.
+      if (initializationProgressToken === null) {
+        initializationProgressToken = params.token;
+      }
+      return null;
+    });
 
-    // Track project loading progress
+    // The TypeScript language server reports its project loading via $/progress
+    // notifications. We wait for the matching "end" notification before proceeding, to
+    // avoid issuing the first user request while the server is still initializing.
     let loadingPromiseResolver: () => void;
     const loadingPromise = new Promise<void>((resolve) => {
       loadingPromiseResolver = resolve;
     });
 
-    let initToken: string | number | null = null;
     let hasStarted = false;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.connection.onNotification('$/progress', (params: any) => {
       if (params.value.kind === 'begin' && params.value.title.includes('Initializing JS/TS')) {
-        initToken = params.token;
         hasStarted = true;
       }
-      if (params.value.kind === 'end' && params.token === initToken) {
+      if (
+        params.value.kind === 'end' &&
+        (initializationProgressToken === null || params.token === initializationProgressToken)
+      ) {
         loadingPromiseResolver();
       }
     });
