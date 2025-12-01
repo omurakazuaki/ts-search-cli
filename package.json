@@ -2,18 +2,14 @@
   "name": "@kazomur/ts-search-cli",
   "version": "0.1.3",
   "private": false,
-
   "repository": {
     "type": "git",
     "url": "git+https://github.com/omurakazuaki/ts-search-cli.git"
   },
-
   "bugs": {
     "url": "https://github.com/omurakazuaki/ts-search-cli/issues"
   },
-
   "homepage": "https://github.com/omurakazuaki/ts-search-cli#readme",
-
   "bin": {
     "ts-search": "./dist/cli.js"
   },
@@ -54,5 +50,8 @@
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.0",
     "typescript-eslint": "^8.48.0"
+  },
+  "volta": {
+    "node": "24.11.1"
   }
 }

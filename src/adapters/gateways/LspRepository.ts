@@ -3,7 +3,6 @@ import * as rpc from 'vscode-jsonrpc/node';
 import * as lsp from 'vscode-languageserver-protocol';
 import { LocationRef, SymbolInfo } from '../../domain/entities';
 import { SymbolId } from '../../domain/SymbolId';
-import { ProjectFileScanner } from '../../infrastructure/file/ProjectFileScanner';
 import { LspProcessManager } from '../../infrastructure/lsp/LspProcessManager';
 import { ILspRepository } from '../../usecases/ports/ILspRepository';
 
@@ -11,11 +10,9 @@ import * as fs from 'fs/promises';
 
 export class LspRepository implements ILspRepository {
   private connection: rpc.MessageConnection | null = null;
-  private readonly fileScanner: ProjectFileScanner;
+  private readonly openedFiles = new Set<string>();
 
-  constructor(private readonly processManager: LspProcessManager) {
-    this.fileScanner = new ProjectFileScanner();
-  }
+  constructor(private readonly processManager: LspProcessManager) {}
 
   async initialize(): Promise<void> {
     this.processManager.start();
@@ -54,6 +51,9 @@ export class LspRepository implements ILspRepository {
     const initParams: lsp.InitializeParams = {
       processId: process.pid,
       rootUri: `file://${rootPath}`,
+      initializationOptions: {
+        disableAutomaticTypingAcquisition: true,
+      },
       capabilities: {
         textDocument: {
           definition: { dynamicRegistration: false },
@@ -82,52 +82,28 @@ export class LspRepository implements ILspRepository {
     await this.connection.sendRequest('initialize', initParams);
     await this.connection.sendNotification('initialized', {});
 
-    const allTsFiles = await this.fileScanner.scan(rootPath);
+    // Wait for loading to complete if it started
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    if (allTsFiles.length > 0) {
-      // Open all files to force LSP to acknowledge them
-      for (const file of allTsFiles) {
-        try {
-          await this.openDocument(file);
-        } catch (e) {
-          console.warn(`Failed to open document ${file}:`, e);
-        }
-      }
+    if (hasStarted) {
+      console.log('Waiting for project indexing to complete...');
+      let timeoutId: NodeJS.Timeout;
+      const timeout = new Promise<void>((resolve) => {
+        timeoutId = setTimeout(() => {
+          console.log('Project indexing timed out.');
+          resolve();
+        }, 300000);
+      });
 
-      // Warm-up: Request document symbols for the first file
-      const absPath = path.resolve(allTsFiles[0]);
-      const uri = `file://${absPath}`;
-      try {
-        await this.connection.sendRequest('textDocument/documentSymbol', {
-          textDocument: { uri },
-        });
-      } catch {
-        // Ignore warm-up errors
-      }
+      // Wrap loadingPromise to clear timeout on completion
+      const loading = loadingPromise.then(() => {
+        clearTimeout(timeoutId);
+      });
 
-      // Wait for loading to complete if it started
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      if (hasStarted) {
-        console.log('Waiting for project indexing to complete...');
-        let timeoutId: NodeJS.Timeout;
-        const timeout = new Promise<void>((resolve) => {
-          timeoutId = setTimeout(() => {
-            console.log('Project indexing timed out.');
-            resolve();
-          }, 300000);
-        });
-
-        // Wrap loadingPromise to clear timeout on completion
-        const loading = loadingPromise.then(() => {
-          clearTimeout(timeoutId);
-        });
-
-        await Promise.race([loading, timeout]);
-        console.log('Project indexing completed or timed out.');
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
+      await Promise.race([loading, timeout]);
+      console.log('Project indexing completed or timed out.');
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
@@ -180,6 +156,7 @@ export class LspRepository implements ILspRepository {
 
   async getReferences(filePath: string, line: number, character: number): Promise<LocationRef[]> {
     this.ensureConnected();
+    await this.openDocument(filePath);
     const uri = `file://${path.resolve(filePath)}`;
 
     const params: lsp.ReferenceParams = {
@@ -200,6 +177,7 @@ export class LspRepository implements ILspRepository {
 
   async getDefinition(filePath: string, line: number, character: number): Promise<LocationRef[]> {
     this.ensureConnected();
+    await this.openDocument(filePath);
     const uri = `file://${path.resolve(filePath)}`;
 
     const params: lsp.DefinitionParams = {
@@ -244,6 +222,10 @@ export class LspRepository implements ILspRepository {
 
   private async openDocument(filePath: string): Promise<void> {
     const absPath = path.resolve(filePath);
+    if (this.openedFiles.has(absPath)) {
+      return;
+    }
+
     const uri = `file://${absPath}`;
     const text = await fs.readFile(absPath, 'utf-8');
 
@@ -255,6 +237,7 @@ export class LspRepository implements ILspRepository {
         text,
       },
     });
+    this.openedFiles.add(absPath);
   }
 
   private ensureConnected() {
