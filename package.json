@@ -20,7 +20,7 @@
   "scripts": {
     "gen-version": "echo \"export const version = '$npm_package_version';\" > src/version.ts",
     "prepare": "npm run gen-version",
-    "build": "npm run gen-version && tsc && chmod +x dist/cli.js",
+    "build": "npm run gen-version && tsup && chmod +x dist/cli.js",
     "cli": "ts-node src/cli.ts",
     "test": "jest",
     "coverage": "jest --coverage",
@@ -55,6 +55,7 @@
     "prettier": "^3.7.2",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.0",
+    "tsup": "^8.5.1",
     "typescript-eslint": "^8.48.0"
   },
   "volta": {
