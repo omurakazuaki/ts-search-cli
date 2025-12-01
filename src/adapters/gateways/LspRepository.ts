@@ -133,9 +133,11 @@ export class LspRepository implements ILspRepository {
     >('textDocument/documentSymbol', params);
 
     const symbols = this.processLspSymbols(result, filePath);
-    const imports = this.getImportSymbols(absPath, fileContent);
+    const sourceFile = ts.createSourceFile(absPath, fileContent, ts.ScriptTarget.Latest, true);
+    const imports = this.getImportSymbols(absPath, sourceFile);
+    const instantiations = this.getClassInstantiations(absPath, sourceFile);
 
-    return [...imports, ...symbols];
+    return [...imports, ...symbols, ...instantiations];
   }
 
   private processLspSymbols(
@@ -257,26 +259,45 @@ export class LspRepository implements ILspRepository {
     }
   }
 
-  private getImportSymbols(filePath: string, content: string): SymbolInfo[] {
-    const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
+  private getImportSymbols(filePath: string, sourceFile: ts.SourceFile): SymbolInfo[] {
     const imports: SymbolInfo[] = [];
 
     ts.forEachChild(sourceFile, (node) => {
       if (ts.isImportDeclaration(node) && node.importClause) {
         const clause = node.importClause;
         if (clause.name) {
-          imports.push(this.createSymbolFromNode(clause.name, filePath, sourceFile, 'Variable'));
+          imports.push(
+            this.createSymbolFromNode(
+              clause.name,
+              clause.name.text,
+              filePath,
+              sourceFile,
+              'Variable',
+            ),
+          );
         }
         if (clause.namedBindings) {
           if (ts.isNamedImports(clause.namedBindings)) {
             clause.namedBindings.elements.forEach((element) => {
               imports.push(
-                this.createSymbolFromNode(element.name, filePath, sourceFile, 'Variable'),
+                this.createSymbolFromNode(
+                  element.name,
+                  element.name.text,
+                  filePath,
+                  sourceFile,
+                  'Variable',
+                ),
               );
             });
           } else if (ts.isNamespaceImport(clause.namedBindings)) {
             imports.push(
-              this.createSymbolFromNode(clause.namedBindings.name, filePath, sourceFile, 'Module'),
+              this.createSymbolFromNode(
+                clause.namedBindings.name,
+                clause.namedBindings.name.text,
+                filePath,
+                sourceFile,
+                'Module',
+              ),
             );
           }
         }
@@ -285,8 +306,37 @@ export class LspRepository implements ILspRepository {
     return imports;
   }
 
+  private getClassInstantiations(filePath: string, sourceFile: ts.SourceFile): SymbolInfo[] {
+    const instantiations: SymbolInfo[] = [];
+
+    const visit = (node: ts.Node) => {
+      if (ts.isNewExpression(node)) {
+        const expression = node.expression;
+        let name = '';
+        if (ts.isIdentifier(expression)) {
+          name = expression.text;
+        } else if (ts.isPropertyAccessExpression(expression)) {
+          name = expression.getText(sourceFile);
+        }
+
+        if (name) {
+          // Use the identifier node for position if available, otherwise use expression
+          const targetNode = ts.isIdentifier(expression) ? expression : expression;
+          instantiations.push(
+            this.createSymbolFromNode(targetNode, name, filePath, sourceFile, 'Class'),
+          );
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+
+    visit(sourceFile);
+    return instantiations;
+  }
+
   private createSymbolFromNode(
-    node: ts.Identifier,
+    node: ts.Node,
+    name: string,
     filePath: string,
     sourceFile: ts.SourceFile,
     kind: string,
@@ -297,16 +347,16 @@ export class LspRepository implements ILspRepository {
 
     return {
       id,
-      name: node.text,
+      name,
       kind,
       line: line + 1,
       range: {
         start: { line: line + 1, character: character + 1 },
-        end: { line: line + 1, character: character + 1 + node.text.length },
+        end: { line: line + 1, character: character + 1 + name.length },
       },
       selectionRange: {
         start: { line: line + 1, character: character + 1 },
-        end: { line: line + 1, character: character + 1 + node.text.length },
+        end: { line: line + 1, character: character + 1 + name.length },
       },
     };
   }

@@ -100,6 +100,9 @@ export class FindSymbolUseCase {
     line: number,
     character: number,
   ): SymbolInfo | undefined {
+    let bestMatch: SymbolInfo | undefined;
+    let minRangeSize = Number.MAX_VALUE;
+
     for (const symbol of symbols) {
       // Check if the point is within the symbol's range
       if (symbol.range) {
@@ -115,13 +118,36 @@ export class FindSymbolUseCase {
           if (symbol.children) {
             const childMatch = this.findSymbolContainingPoint(symbol.children, line, character);
             if (childMatch) {
-              return childMatch;
+              // If a child matches, it's definitely smaller/more specific than the parent
+              // But we need to compare it with the current bestMatch from other siblings
+              const childSize = this.getRangeSize(childMatch);
+              if (childSize < minRangeSize) {
+                minRangeSize = childSize;
+                bestMatch = childMatch;
+              }
+              // We found a match in this branch, but we continue to check other siblings
+              // in case there's an overlapping sibling with a smaller range (unlikely in proper tree, but possible with our mixed sources)
+              continue;
             }
           }
-          return symbol;
+
+          // If no child matched, check the symbol itself
+          const size = this.getRangeSize(symbol);
+          if (size < minRangeSize) {
+            minRangeSize = size;
+            bestMatch = symbol;
+          }
         }
       }
     }
-    return undefined;
+    return bestMatch;
+  }
+
+  private getRangeSize(symbol: SymbolInfo): number {
+    if (!symbol.range) return Number.MAX_VALUE;
+    const lines = symbol.range.end.line - symbol.range.start.line;
+    const chars = symbol.range.end.character - symbol.range.start.character;
+    // Simple heuristic: lines * 10000 + chars
+    return lines * 10000 + chars;
   }
 }
