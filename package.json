@@ -2,6 +2,9 @@
   "name": "@kazomur/ts-search-cli",
   "version": "0.1.4",
   "private": false,
+  "files": [
+    "dist"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/omurakazuaki/ts-search-cli.git"
