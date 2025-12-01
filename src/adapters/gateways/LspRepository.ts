@@ -12,6 +12,7 @@ import * as fs from 'fs/promises';
 export class LspRepository implements ILspRepository {
   private connection: rpc.MessageConnection | null = null;
   private readonly openedFiles = new Set<string>();
+  private diagnosticResolvers = new Map<string, () => void>();
 
   constructor(private readonly processManager: LspProcessManager) {}
 
@@ -24,6 +25,17 @@ export class LspRepository implements ILspRepository {
     );
 
     this.connection.listen();
+
+    // Handle diagnostics to track file processing
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.connection.onNotification('textDocument/publishDiagnostics', (params: any) => {
+      const uri = params.uri;
+      const resolver = this.diagnosticResolvers.get(uri);
+      if (resolver) {
+        resolver();
+        this.diagnosticResolvers.delete(uri);
+      }
+    });
 
     // Handle progress creation request
     this.connection.onRequest('window/workDoneProgress/create', () => null);
@@ -82,9 +94,9 @@ export class LspRepository implements ILspRepository {
 
     await this.connection.sendRequest('initialize', initParams);
     await this.connection.sendNotification('initialized', {});
-
-    // Wait for loading to complete if it started
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await this.connection.sendNotification('workspace/didChangeConfiguration', {
+      settings: {},
+    });
 
     if (hasStarted) {
       console.log('Waiting for project indexing to complete...');
@@ -103,8 +115,19 @@ export class LspRepository implements ILspRepository {
 
       await Promise.race([loading, timeout]);
       console.log('Project indexing completed or timed out.');
-    } else {
+
+      // Add a small buffer after indexing to ensure server is fully ready
       await new Promise((resolve) => setTimeout(resolve, 1000));
+    } else {
+      // If no progress started, wait a bit more just in case
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    // Force a workspace symbol search to trigger any lazy indexing
+    try {
+      await this.connection.sendRequest('workspace/symbol', { query: 'CliPresenter' });
+    } catch {
+      // Ignore errors
     }
   }
 
@@ -242,6 +265,18 @@ export class LspRepository implements ILspRepository {
     const uri = `file://${absPath}`;
     const text = await fs.readFile(absPath, 'utf-8');
 
+    // Setup listener for diagnostics
+    const diagnosticsPromise = new Promise<void>((resolve) => {
+      this.diagnosticResolvers.set(uri, resolve);
+      // Set a timeout just in case diagnostics never come
+      setTimeout(() => {
+        if (this.diagnosticResolvers.has(uri)) {
+          this.diagnosticResolvers.delete(uri);
+          resolve();
+        }
+      }, 5000);
+    });
+
     await this.connection!.sendNotification('textDocument/didOpen', {
       textDocument: {
         uri,
@@ -251,6 +286,9 @@ export class LspRepository implements ILspRepository {
       },
     });
     this.openedFiles.add(absPath);
+
+    // Wait for diagnostics to ensure server has processed the file
+    await diagnosticsPromise;
   }
 
   private ensureConnected() {
