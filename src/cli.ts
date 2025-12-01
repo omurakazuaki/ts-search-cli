@@ -7,6 +7,7 @@ import * as net from 'net';
 import * as path from 'path';
 import { CliPresenter } from './adapters/presenters/CliPresenter';
 import { getDaemonFilePath } from './utils/daemon';
+import { version } from './version';
 
 const cli = cac('ts-search');
 const presenter = new CliPresenter();
@@ -189,6 +190,6 @@ cli.command('stop', 'Stop the background server').action(async () => {
 });
 
 cli.help();
-cli.version('0.1.1');
+cli.version(version);
 
 cli.parse();
