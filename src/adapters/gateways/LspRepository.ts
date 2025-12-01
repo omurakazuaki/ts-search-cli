@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as ts from 'typescript';
 import * as rpc from 'vscode-jsonrpc/node';
 import * as lsp from 'vscode-languageserver-protocol';
 import { LocationRef, SymbolInfo } from '../../domain/entities';
@@ -121,6 +122,7 @@ export class LspRepository implements ILspRepository {
     await this.openDocument(filePath);
     const absPath = path.resolve(filePath);
     const uri = `file://${absPath}`;
+    const fileContent = await fs.readFile(absPath, 'utf-8');
 
     const params: lsp.DocumentSymbolParams = {
       textDocument: { uri },
@@ -130,9 +132,18 @@ export class LspRepository implements ILspRepository {
       lsp.DocumentSymbol[] | lsp.SymbolInformation[]
     >('textDocument/documentSymbol', params);
 
+    const symbols = this.processLspSymbols(result, filePath);
+    const imports = this.getImportSymbols(absPath, fileContent);
+
+    return [...imports, ...symbols];
+  }
+
+  private processLspSymbols(
+    result: lsp.DocumentSymbol[] | lsp.SymbolInformation[] | null,
+    filePath: string,
+  ): SymbolInfo[] {
     if (!result) return [];
 
-    // Handle both DocumentSymbol[] and SymbolInformation[]
     if (result.length > 0 && 'range' in result[0] && 'selectionRange' in result[0]) {
       return (result as lsp.DocumentSymbol[]).map((s) => this.mapDocumentSymbol(s, filePath));
     }
@@ -244,6 +255,60 @@ export class LspRepository implements ILspRepository {
     if (!this.connection) {
       throw new Error('LSP connection not initialized');
     }
+  }
+
+  private getImportSymbols(filePath: string, content: string): SymbolInfo[] {
+    const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
+    const imports: SymbolInfo[] = [];
+
+    ts.forEachChild(sourceFile, (node) => {
+      if (ts.isImportDeclaration(node) && node.importClause) {
+        const clause = node.importClause;
+        if (clause.name) {
+          imports.push(this.createSymbolFromNode(clause.name, filePath, sourceFile, 'Variable'));
+        }
+        if (clause.namedBindings) {
+          if (ts.isNamedImports(clause.namedBindings)) {
+            clause.namedBindings.elements.forEach((element) => {
+              imports.push(
+                this.createSymbolFromNode(element.name, filePath, sourceFile, 'Variable'),
+              );
+            });
+          } else if (ts.isNamespaceImport(clause.namedBindings)) {
+            imports.push(
+              this.createSymbolFromNode(clause.namedBindings.name, filePath, sourceFile, 'Module'),
+            );
+          }
+        }
+      }
+    });
+    return imports;
+  }
+
+  private createSymbolFromNode(
+    node: ts.Identifier,
+    filePath: string,
+    sourceFile: ts.SourceFile,
+    kind: string,
+  ): SymbolInfo {
+    const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+    const relativePath = path.relative(process.cwd(), filePath);
+    const id = new SymbolId(relativePath, line + 1, character + 1).toString();
+
+    return {
+      id,
+      name: node.text,
+      kind,
+      line: line + 1,
+      range: {
+        start: { line: line + 1, character: character + 1 },
+        end: { line: line + 1, character: character + 1 + node.text.length },
+      },
+      selectionRange: {
+        start: { line: line + 1, character: character + 1 },
+        end: { line: line + 1, character: character + 1 + node.text.length },
+      },
+    };
   }
 
   private mapDocumentSymbol(symbol: lsp.DocumentSymbol, filePath: string): SymbolInfo {
