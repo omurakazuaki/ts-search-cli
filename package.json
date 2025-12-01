@@ -1,6 +1,7 @@
 {
   "name": "@kazomur/ts-search-cli",
   "version": "0.1.4",
+  "license": "MIT",
   "private": false,
   "files": [
     "dist"
